@@ -59,11 +59,20 @@ class XmppProvider {
   Stream<ConnexionStatus> connect(String phone) {
     StreamController<ConnexionStatus> streamController =
         new StreamController<ConnexionStatus>();
-    print(this.formatToJid(phone));
-    _connection.connect(this.formatToJid(phone), this._pass,
-        (int status, condition, ele) {
+    String jid = this.formatToJid(phone);
+    if (this._pass == null ||
+        this._pass.isEmpty ||
+        jid == null ||
+        jid.isEmpty) {
+      streamController.addError(
+          "Le numéro de téléphone ou le mot de passe n'est pas renseigné");
+      streamController.close();
+      return streamController.stream;
+    }
+    _connection.connect(jid, this._pass, (int status, condition, ele) {
       streamController.add(new ConnexionStatus(status, condition, ele));
       if (status == Strophe.Status['CONNECTED']) {
+        this.jid = jid;
         this.sendPresence();
         streamController.close();
       } else if (status == Strophe.Status['DISCONNECTED'])
