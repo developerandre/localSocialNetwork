@@ -1,4 +1,4 @@
-package com.example.strophe;
+package com.example.localsocialnetwork;
 
 /**
  * Created by andre on 27/03/18.
@@ -6,11 +6,11 @@ package com.example.strophe;
 
 public class SHA1 {
     /*
-* Calculate the SHA-1 of an array of big-endian words, and a bit length
-*/
+    * Calculate the SHA-1 of an array of big-endian words, and a bit length
+    */
     static int[] core_sha1(int[] x, int len) {
 
-  /* append padding */
+        /* append padding */
         int[] temp = x;
         if ((x.length <= (len >> 5))) {
             temp = new int[(len >> 5) + 1];
@@ -52,8 +52,7 @@ public class SHA1 {
                 } else {
                     w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
                 }
-                t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)),
-                        safe_add(safe_add(e, w[j]), sha1_kt(j)));
+                t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)), safe_add(safe_add(e, w[j]), sha1_kt(j)));
                 e = d;
                 d = c;
                 c = rol(b, 30);
@@ -67,7 +66,7 @@ public class SHA1 {
             d = safe_add(d, oldd);
             e = safe_add(e, olde);
         }
-        return new int[]{a, b, c, d, e};
+        return new int[] { a, b, c, d, e };
     }
 
     /*
@@ -91,8 +90,7 @@ public class SHA1 {
      * Determine the appropriate additive constant for the current iteration
      */
     static int sha1_kt(int t) {
-        return (t < 20) ? 1518500249 : (t < 40) ? 1859775393 :
-                (t < 60) ? -1894007588 : -899497514;
+        return (t < 20) ? 1518500249 : (t < 40) ? 1859775393 : (t < 60) ? -1894007588 : -899497514;
     }
 
     /*
@@ -107,8 +105,10 @@ public class SHA1 {
         int[] opad = new int[16];
         int bCle;
         for (int i = 0; i < 16; i++) {
-            if (bkey.length <= i) bCle = 0;
-            else bCle = bkey[i];
+            if (bkey.length <= i)
+                bCle = 0;
+            else
+                bCle = bkey[i];
             ipad[i] = bCle ^ 0x36363636;
             opad[i] = bCle ^ 0x5C5C5C5C;
         }
@@ -182,7 +182,10 @@ public class SHA1 {
      * Convert an array of big-endian words to a base-64 string
      */
     static String binb2b64(int[] binarray) {
-        String[] tab = new String[]{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+", "/"};
+        String[] tab = new String[] { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P",
+                "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k",
+                "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5",
+                "6", "7", "8", "9", "+", "/" };
         String str = "";
         int triplet;
         int bin, bin2, bin3;
@@ -190,9 +193,8 @@ public class SHA1 {
             bin = (i >> 2) < binarray.length ? binarray[i >> 2] : 0;
             bin2 = (i + 1 >> 2) < binarray.length ? binarray[i + 1 >> 2] : 0;
             bin3 = (i + 2 >> 2) < binarray.length ? binarray[i + 2 >> 2] : 0;
-            triplet = (((bin >> 8 * (3 - i % 4)) & 0xFF) << 16) |
-                    (((bin2 >> 8 * (3 - (i + 1) % 4)) & 0xFF) << 8) |
-                    ((bin3 >> 8 * (3 - (i + 2) % 4)) & 0xFF);
+            triplet = (((bin >> 8 * (3 - i % 4)) & 0xFF) << 16) | (((bin2 >> 8 * (3 - (i + 1) % 4)) & 0xFF) << 8)
+                    | ((bin3 >> 8 * (3 - (i + 2) % 4)) & 0xFF);
             for (int j = 0; j < 4; j++) {
                 if (i * 8 + j * 6 > binarray.length * 32) {
                     str += "=";
