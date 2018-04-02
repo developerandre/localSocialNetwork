@@ -6,12 +6,13 @@ import 'dart:math';
 import 'package:localsocialnetwork/strophe/bosh.dart';
 import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/strophe/md5.dart';
+import 'package:localsocialnetwork/strophe/plugins/plugins.dart';
 import 'package:localsocialnetwork/strophe/sessionstorage.dart';
 import 'package:localsocialnetwork/strophe/sha1.dart';
 import 'package:localsocialnetwork/strophe/utils.dart';
 import 'package:xml/xml.dart' as xml;
 
-const Map<String, int> ConnexionStatus = const {
+Map<String, int> ConnexionStatus = {
   'ERROR': 0,
   'CONNECTING': 1,
   'CONNFAIL': 2,
@@ -24,7 +25,7 @@ const Map<String, int> ConnexionStatus = const {
   "REDIRECT": 9,
   "CONNTIMEOUT": 10
 };
-const Map<String, String> NAMESPACE = const {
+Map<String, String> NAMESPACE = {
   'HTTPBIND': "http://jabber.org/protocol/httpbind",
   'BOSH': "urn:xmpp:xbosh",
   'CLIENT': "jabber:client",
@@ -292,11 +293,13 @@ class StanzaHandler {
   Function handler;
   String ns;
   String name;
-  String type;
+  List<String> type; // String or List
   String id;
   Map options;
   StanzaHandler(
-      this.handler, this.ns, this.name, this.type, this.id, this.options);
+      this.handler, this.ns, this.name, ptype, this.id, this.options) {
+    this.type = ptype is List ? ptype : [ptype];
+  }
 
 /** PrivateFunction: getNamespace
      *  Returns the XML namespace attribute on an element.
@@ -363,9 +366,10 @@ class StanzaHandler {
     }
     String elemType = elem.getAttribute("type");
     String id = elem.getAttribute("id");
+    bool statement = this.type.indexOf(elemType) != -1;
     if (this.namespaceMatch(elem) &&
         (this.name == null || Strophe.isTagEqual(elem, this.name)) &&
-        (this.type == null || elemType == this.type) &&
+        (this.type == null || this.type.contains(null) || statement) &&
         (this.id == null || id == this.id) &&
         (this.from == null || from == this.from)) {
       return true;
@@ -479,6 +483,13 @@ class StropheConnection {
   bool doSession;
 
   bool doBind;
+  get register {
+    return Strophe.connectionPlugins['register'];
+  }
+
+  get disco {
+    return Strophe.connectionPlugins['disco'];
+  }
 
   List<StanzaTimedHandler> timedHandlers;
 
@@ -547,6 +558,9 @@ class StropheConnection {
     return this._requests;
   }
 
+  Function _reset;
+  ConnexionCallback _connectCb;
+  AuthenticateCallback _authenticate;
   StropheConnection(String service, [Map options]) {
     this.service = service;
     // Configuration options
@@ -609,11 +623,133 @@ class StropheConnection {
     this.cookies = Utils.addCookies(this.options['cookies']);
     this.registerSASLMechanisms(this.options['mechanisms']);
 
+    this.initializeFunction();
     // initialize plugins
     Strophe.connectionPlugins.forEach((String key, dynamic value) {
       Strophe.connectionPlugins[key].init(this);
     });
   }
+  initializeFunction() {
+    this._reset = () {
+      this._proto.reset();
+
+      // SASL
+      this.doSession = false;
+      this.doBind = false;
+
+      // handler lists
+      this.timedHandlers = [];
+      this.handlers = [];
+      this.removeTimeds = [];
+      this.removeHandlers = [];
+      this.addTimeds = [];
+      this.addHandlers = [];
+
+      this.authenticated = false;
+      this.connected = false;
+      this.disconnecting = false;
+      this.restored = false;
+
+      this._data = [];
+      this._requests = [];
+      this._uniqueId = 0;
+    };
+    this._connectCb = (req, Function _callback, String raw) {
+      Strophe.info("_connect_cb was called");
+      this.connected = true;
+
+      xml.XmlElement bodyWrap;
+      try {
+        bodyWrap = this._proto.reqToData(req);
+      } catch (e) {
+        if (e.toString() != "badformat") {
+          throw e;
+        }
+        this._changeConnectStatus(
+            Strophe.Status['CONNFAIL'], Strophe.ErrorCondition['BAD_FORMAT']);
+        this._doDisconnect(Strophe.ErrorCondition['BAD_FORMAT']);
+      }
+      if (bodyWrap == null) {
+        return;
+      }
+
+      //if (this.xmlInput != Strophe.Connection.xmlInput) {
+      if (bodyWrap.name.qualified == this._proto.strip &&
+          bodyWrap.children.length > 0) {
+        this.xmlInput(bodyWrap.firstChild);
+      } else {
+        this.xmlInput(bodyWrap);
+      }
+      //}
+      //if (this.rawInput != Strophe.Connection.rawInput) {
+      if (raw != null) {
+        this.rawInput(raw);
+      } else {
+        this.rawInput(Strophe.serialize(bodyWrap));
+      }
+      //}
+
+      int conncheck = this._proto.connectCb(bodyWrap);
+      if (conncheck == Strophe.Status['CONNFAIL']) {
+        return;
+      }
+
+      // Check for the stream:features tag
+      bool hasFeatures;
+      if (bodyWrap.getAttribute('xmlns') == Strophe.NS['STREAM']) {
+        hasFeatures = bodyWrap.findAllElements("features").length > 0 ||
+            bodyWrap.findAllElements("stream:features").length > 0;
+      } else {
+        hasFeatures = bodyWrap.findAllElements("stream:features").length > 0 ||
+            bodyWrap.findAllElements("features").length > 0;
+      }
+      if (!hasFeatures) {
+        this._noAuthReceived(_callback);
+        return;
+      }
+
+      List<StropheSASLMechanism> matched = [];
+
+      String mech;
+      List<xml.XmlElement> mechanisms =
+          bodyWrap.findAllElements("mechanism").toList();
+      if (mechanisms.length > 0) {
+        for (int i = 0; i < mechanisms.length; i++) {
+          mech = Strophe.getText(mechanisms.elementAt(i));
+          if (this.mechanisms[mech] != null) matched.add(this.mechanisms[mech]);
+        }
+      }
+      if (matched.length == 0) {
+        if (bodyWrap.findAllElements("auth").length == 0) {
+          // There are no matching SASL mechanisms and also no legacy
+          // auth available.
+          this._noAuthReceived(_callback);
+          return;
+        }
+      }
+      if (this.doAuthentication != false) {
+        this.authenticate(matched);
+      }
+    };
+    this._authenticate = (List<StropheSASLMechanism> matched) async {
+      if (!await this._attemptSASLAuth(matched)) {
+        this._attemptLegacyAuth();
+      }
+    };
+  }
+
+  addConnectionPlugin(String name, PluginClass ptype) {
+    Strophe.addConnectionPlugin(name, ptype);
+  }
+
+  ServiceType get proto {
+    return this._proto;
+  }
+
+  set proto(ServiceType pro) {
+    this._proto = pro;
+  }
+
   get data {
     return this._data;
   }
@@ -636,29 +772,13 @@ class StropheConnection {
      *  This function should be called after a connection is disconnected
      *  before this connection is reused.
      */
-  reset() {
-    this._proto.reset();
+  set reset(Function callback) {
+    this._reset = callback;
+  }
 
-    // SASL
-    this.doSession = false;
-    this.doBind = false;
-
-    // handler lists
-    this.timedHandlers = [];
-    this.handlers = [];
-    this.removeTimeds = [];
-    this.removeHandlers = [];
-    this.addTimeds = [];
-    this.addHandlers = [];
-
-    this.authenticated = false;
-    this.connected = false;
-    this.disconnecting = false;
-    this.restored = false;
-
-    this._data = [];
-    this._requests = [];
-    this._uniqueId = 0;
+  Function get reset {
+    if (_reset == null) initializeFunction();
+    return this._reset;
   }
 
   /** Function: pause
@@ -1165,15 +1285,13 @@ class StropheConnection {
                                                                                      *  Returns:
                                                                                      *    The id used to send the IQ.
                                                                                     */
-  sendIQ(xml.XmlNode elem, Function callback, Function errback, int timeout) {
+  sendIQ(xml.XmlNode el, [Function callback, Function errback, int timeout]) {
     var timeoutHandler;
-    elem = elem.root;
-
-    xml.XmlAttribute firstWhere =
-        elem.attributes.firstWhere((xml.XmlAttribute attr) {
-      return attr.name.toString() == 'id';
-    });
-    String id = firstWhere != null ? firstWhere.value : '';
+    xml.XmlElement elem = el;
+    if (el is xml.XmlDocument)
+      elem = el.rootElement;
+    else if (el is xml.XmlElement) elem = el;
+    String id = elem.getAttribute("id");
     if (id == null) {
       // inject id if not found
       id = this.getUniqueId("sendIQ");
@@ -1181,17 +1299,13 @@ class StropheConnection {
           .add(new xml.XmlAttribute(new xml.XmlName.fromString('id'), id));
     }
 
-    if (callback == null || errback == null) {
+    if (callback != null || errback != null) {
       var handler = this.addHandler((stanza) {
         // remove timeout handler if there is one
         if (timeoutHandler) {
           this.deleteTimedHandler(timeoutHandler);
         }
-        xml.XmlAttribute firstWhere =
-            elem.attributes.firstWhere((xml.XmlAttribute attr) {
-          return attr.name.toString() == 'type';
-        });
-        String iqtype = firstWhere != null ? firstWhere.value : '';
+        String iqtype = elem.getAttribute("type");
         if (iqtype == 'result') {
           if (callback != null) {
             callback(stanza);
@@ -1481,7 +1595,7 @@ class StropheConnection {
 
   _changeConnectStatus(int status, String condition, [xml.XmlNode elem]) {
     // notify all plugins listening for status changes
-    Strophe.connectionPlugins.forEach((String key, dynamic plugin) {
+    Strophe.connectionPlugins.forEach((String key, PluginClass plugin) {
       if (plugin.statusChanged != null) {
         try {
           plugin.statusChanged(status, condition);
@@ -1601,7 +1715,6 @@ class StropheConnection {
     while (this.addHandlers.length > 0) {
       this.handlers.add(this.addHandlers.removeLast());
     }
-
     // handle graceful disconnect
     if (this.disconnecting && this._proto.emptyQueue()) {
       this._doDisconnect();
@@ -1673,6 +1786,10 @@ class StropheConnection {
                                                                                                                                                                                                                                                                                                                                                                                                          *
                                                                                                                                                                                                                                                                                                                                                                                                          * Sends a blank poll request.
                                                                                                                                                                                                                                                                                                                                                                                                          */
+  Function get noAuthReceived {
+    return _noAuthReceived;
+  }
+
   _noAuthReceived([Function _callback]) {
     var errorMsg = "Server did not offer a supported authentication mechanism";
     Strophe.error(errorMsg);
@@ -1700,87 +1817,18 @@ class StropheConnection {
                                                                                                                                                                                                                                                                                                                                                                                                          *      Useful for plugins with their own xmpp connect callback (when they
                                                                                                                                                                                                                                                                                                                                                                                                          *      want to do something special).
                                                                                                                                                                                                                                                                                                                                                                                                          */
-  connectCb(req, Function _callback, String raw) {
-    this._connectCb(req, _callback, raw);
+
+  set connectCb(ConnexionCallback param) {
+    this._connectCb = param;
   }
 
-  _connectCb(req, Function _callback, String raw) {
-    Strophe.info("_connect_cb was called");
-    this.connected = true;
-
-    xml.XmlElement bodyWrap;
-    try {
-      bodyWrap = this._proto.reqToData(req);
-    } catch (e) {
-      if (e.toString() != "badformat") {
-        throw e;
-      }
-      this._changeConnectStatus(
-          Strophe.Status['CONNFAIL'], Strophe.ErrorCondition['BAD_FORMAT']);
-      this._doDisconnect(Strophe.ErrorCondition['BAD_FORMAT']);
-    }
-    if (bodyWrap == null) {
-      return;
-    }
-
-    //if (this.xmlInput != Strophe.Connection.xmlInput) {
-    if (bodyWrap.name.qualified == this._proto.strip &&
-        bodyWrap.children.length > 0) {
-      this.xmlInput(bodyWrap.firstChild);
-    } else {
-      this.xmlInput(bodyWrap);
-    }
-    //}
-    //if (this.rawInput != Strophe.Connection.rawInput) {
-    if (raw != null) {
-      this.rawInput(raw);
-    } else {
-      this.rawInput(Strophe.serialize(bodyWrap));
-    }
-    //}
-
-    int conncheck = this._proto.connectCb(bodyWrap);
-    if (conncheck == Strophe.Status['CONNFAIL']) {
-      return;
-    }
-
-    // Check for the stream:features tag
-    bool hasFeatures;
-    if (bodyWrap.getAttribute('xmlns') == Strophe.NS['STREAM']) {
-      hasFeatures = bodyWrap.findAllElements("features").length > 0 ||
-          bodyWrap.findAllElements("stream:features").length > 0;
-    } else {
-      hasFeatures = bodyWrap.findAllElements("stream:features").length > 0 ||
-          bodyWrap.findAllElements("features").length > 0;
-    }
-    if (!hasFeatures) {
-      this._noAuthReceived(_callback);
-      return;
-    }
-
-    List<StropheSASLMechanism> matched = [];
-
-    String mech;
-    List<xml.XmlElement> mechanisms =
-        bodyWrap.findAllElements("mechanism").toList();
-    if (mechanisms.length > 0) {
-      for (int i = 0; i < mechanisms.length; i++) {
-        mech = Strophe.getText(mechanisms.elementAt(i));
-        if (this.mechanisms[mech] != null) matched.add(this.mechanisms[mech]);
-      }
-    }
-    if (matched.length == 0) {
-      if (bodyWrap.findAllElements("auth").length == 0) {
-        // There are no matching SASL mechanisms and also no legacy
-        // auth available.
-        this._noAuthReceived(_callback);
-        return;
-      }
-    }
-    if (this.doAuthentication != false) {
-      this.authenticate(matched);
-    }
+  ConnexionCallback get connectCb {
+    if (_reset == null) initializeFunction();
+    return this._connectCb;
   }
+/* set connectCb(){
+
+} */
 
   /** Function: sortMechanismsByPriority
                                                                                                                                                                                                                                                                                                                                                                                                              *
@@ -1894,10 +1942,14 @@ class StropheConnection {
                                                                                                                                                                                                                                                                                                                                                                                                              *    (Array) matched - Array of SASL mechanisms supported.
                                                                                                                                                                                                                                                                                                                                                                                                              *
                                                                                                                                                                                                                                                                                                                                                                                                              */
-  authenticate(List<StropheSASLMechanism> matched) async {
-    if (!await this._attemptSASLAuth(matched)) {
-      this._attemptLegacyAuth();
-    }
+
+  set authenticate(AuthenticateCallback callback) {
+    this._authenticate = callback;
+  }
+
+  AuthenticateCallback get authenticate {
+    if (_authenticate == null) initializeFunction();
+    return this._authenticate;
   }
 
   /** PrivateFunction: _saslChallengeCb
@@ -2228,6 +2280,11 @@ class StropheConnection {
                                                                                                                                                                                                                                                                                                                                                                                                              *    (String) type - The stanza type attribute to match.
                                                                                                                                                                                                                                                                                                                                                                                                              *    (String) id - The stanza id attribute to match.
                                                                                                                                                                                                                                                                                                                                                                                                              */
+  StanzaHandler addSysHandler(
+      Function handler, String ns, String name, String type, String id) {
+    return _addSysHandler(handler, ns, name, type, id);
+  }
+
   StanzaHandler _addSysHandler(
       Function handler, String ns, String name, String type, String id) {
     StanzaHandler hand = Strophe.Handler(handler, ns, name, type, id);

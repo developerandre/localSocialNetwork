@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:localsocialnetwork/strophe/enums.dart';
 import 'package:xml/xml/nodes/element.dart';
 
 class Utils {
@@ -58,3 +59,5 @@ class Utils {
 typedef void ConnectCallBack(int status, dynamic condition, dynamic elem);
 typedef void XmlInputCallback(XmlElement elem);
 typedef void RawInputCallback(String elem);
+typedef void ConnexionCallback(req, Function _callback, String raw);
+typedef void AuthenticateCallback(List<StropheSASLMechanism> matched);

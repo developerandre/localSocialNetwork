@@ -21,8 +21,8 @@ class Strophe {
      */
   static const num TIMEOUT = 1.1;
   static const num SECONDARY_TIMEOUT = 0.1;
-  static const Map<String, int> Status = ConnexionStatus;
-  static const Map<String, String> NS = NAMESPACE;
+  static Map<String, int> Status = ConnexionStatus;
+  static Map<String, String> NS = NAMESPACE;
   static const Map<String, String> ErrorCondition = ERRORSCONDITIONS;
   static const Map<String, int> LogLevel = LOGLEVEL;
   static const Map<String, int> ElementType = ELEMENTTYPE;
@@ -656,7 +656,7 @@ class Strophe {
      *    (String) name - The name of the extension.
      *    (Object) ptype - The plugin's prototype.
      */
-  addConnectionPlugin(String name, ptype) {
+  static void addConnectionPlugin(String name, ptype) {
     Strophe._connectionPlugins[name] = ptype;
   }
 /** Class: Strophe.Builder
@@ -734,7 +734,7 @@ class Strophe {
  *    A new Strophe.Handler object.
 */
   static StanzaHandler Handler(Function handler, String ns, String name,
-      [String type, String id, String from, Map options]) {
+      [type, String id, String from, Map options]) {
     StanzaHandler stanzaHandler = new StanzaHandler(
         handler,
         ns,
