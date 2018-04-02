@@ -9,6 +9,7 @@ class MyApp extends StatelessWidget {
     @override
     Widget build(BuildContext context) => new MaterialApp(
         title: 'Local Social Network',
+        debugShowCheckedModeBanner: false,
         routes: {
             '/contacts': (_) => new ContactsPage(),
             '/sign-up': (_) => new SignUpPage(),
