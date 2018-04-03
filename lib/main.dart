@@ -6,7 +6,7 @@ import 'package:localsocialnetwork/strophe/plugins/register.dart';
 void main() {
   XmppProvider instance =
       XmppProvider.instance(plugins: {'register': new RegisterPlugin()});
-  instance.register("yesIam").listen((ConnexionStatus status) {});
+  instance.connect("yesIam").listen((ConnexionStatus status) {});
 
   runApp(new MyApp());
 }
