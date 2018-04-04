@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:contacts_service/contacts_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:localsocialnetwork/pages/chat/chat.page.dart';
 
 
 class ContactsPage extends StatefulWidget {
-
     @override
-    State<ContactsPage> createState() => new ContactsPageState();
+    ContactsPageState createState() => new ContactsPageState();
 }
 
 class ContactsPageState extends State<ContactsPage> {
     GlobalKey<ScaffoldState> _scaffold = new GlobalKey<ScaffoldState>();
     Iterable<Contact> _contacts = [];
+    String _title = '';
 
     @override
     Widget build(BuildContext context) => new Scaffold(
         key: _scaffold,
         appBar: new AppBar(
-            title: new Text('12345678'),
+            title: new Text(_title),
             actions: [
                 new PopupMenuButton(
                     itemBuilder: (_) => [
@@ -51,6 +53,23 @@ class ContactsPageState extends State<ContactsPage> {
         .catchError((e) {
             print(e);
         });
+
+        SharedPreferences.getInstance()
+        .then((SharedPreferences preferences) {
+            String phoneNumber = preferences.getString('phoneNumber');
+
+            if (phoneNumber == null) {
+                // Navigator.of(context).pus
+            }
+            else {
+                setState(() {
+                    _title = phoneNumber;
+                });
+            }
+        })
+        .catchError((e) {
+            print(e);
+        });
     }
 
     List<ListTile> _contactsTiles() {
@@ -58,10 +77,15 @@ class ContactsPageState extends State<ContactsPage> {
 
         _contacts.forEach((Contact contact) {
             tiles.add(new ListTile(
+                leading: new CircleAvatar(
+                    child: new Text(contact.displayName[0]),
+                ),
                 title: new Text(contact.displayName),
                 subtitle: contact.phones.toList().isEmpty ? null : new Text(contact.phones.toList()[0].value),
                 onTap: () {
-                    print(contact);
+                    Navigator.push(context, new MaterialPageRoute(
+                        builder: (_) => new ChatPage(title: contact.displayName,)
+                    ));
                 },
             ));
         });
