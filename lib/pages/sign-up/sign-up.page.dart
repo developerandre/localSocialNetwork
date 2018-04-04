@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/pages/sign-up/sign-up.service.dart' as signUpService;
+import 'package:localsocialnetwork/providers/xmpp.dart';
 
 
 class SignUpPage extends StatefulWidget {
@@ -24,12 +26,13 @@ class SignUpPageState extends State<SignUpPage> {
     TextEditingController _phoneNumberController = new TextEditingController();
     TextEditingController _codeController = new TextEditingController();
     GlobalKey<ScaffoldState> _scaffold = new GlobalKey<ScaffoldState>();
+    XmppProvider _xmpp = XmppProvider.instance();
 
     @override
     Widget build(BuildContext context) => new Scaffold(
         key: _scaffold,
         appBar: new AppBar(
-            title: new Text('Sign up step ${widget.step.toString()}'),
+            title: new Text('Sign in step ${widget.step.toString()}'),
         ),
         body: new SingleChildScrollView(
             child: new Padding(
@@ -83,14 +86,14 @@ class SignUpPageState extends State<SignUpPage> {
     void _getPassword() {
         signUpService.getPassword(widget.phoneNumber, _codeController.text)
         .then((http.Response r) {
-            var body = JSON.decode(r.body);
-            print(body);
+            dynamic body = JSON.decode(r.body);
 
             SharedPreferences.getInstance()
             .then((SharedPreferences preferences) {
                 preferences.setString('phoneNumber', widget.phoneNumber);
                 preferences.setString('password', body['password']);
-                print(preferences);
+
+                _signUp();
 
                 Navigator.of(context).pushNamedAndRemoveUntil('/contacts', (_) => false);
             })
@@ -110,5 +113,12 @@ class SignUpPageState extends State<SignUpPage> {
         if (widget.step == 2 && widget.code != null) {
             _codeController.text = widget.code.toString();
         }
+    }
+
+    void _signUp() {
+        _xmpp.register(widget.phoneNumber)
+        .listen((ConnexionStatus status) {
+            print(status.status);
+        });
     }
 }

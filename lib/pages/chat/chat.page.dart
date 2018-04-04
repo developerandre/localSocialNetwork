@@ -27,18 +27,15 @@ class ChatPageState extends State<ChatPage> {
                         itemBuilder: (_, int index) => _messageView(index),
                     )
                 ),
+                new Divider(),
                 new Row(
                     children: [
                         new Expanded(
                             child: new TextField(
                                 // maxLines: 2,
-                                keyboardType: TextInputType.multiline,
+                                // keyboardType: TextInputType.multiline,
                                 decoration: new InputDecoration(
                                     hintText: 'Message',
-                                    border: new OutlineInputBorder(
-                                        borderRadius: new BorderRadius.circular(100.0),
-                                        gapPadding: 0.0
-                                    )
                                 ),
                             ),
                         ),
