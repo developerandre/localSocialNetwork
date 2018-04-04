@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:localsocialnetwork/app.dart';
 import 'package:localsocialnetwork/providers/xmpp.dart';
-import 'package:localsocialnetwork/strophe/plugins/register.dart';
 
 void main() {
-  XmppProvider instance =
-      XmppProvider.instance(plugins: {'register': new RegisterPlugin()});
-  instance.register("yesIam").listen((ConnexionStatus status) {});
+  XmppProvider instance = XmppProvider.instance();
+  instance.connection.xmlInput = (elem) {
+    print('xmlInput $elem');
+  };
+  instance.connection.xmlOutput = (elem) {
+    print('xmlOutput $elem');
+  };
+  instance.connect("tonandre").listen((ConnexionStatus status) {});
 
   runApp(new MyApp());
 }
