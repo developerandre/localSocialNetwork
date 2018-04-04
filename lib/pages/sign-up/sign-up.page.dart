@@ -106,18 +106,9 @@ class SignUpPageState extends State<SignUpPage> {
     @override
     void initState() {
         super.initState();
-        checkIfIsAuthetificated();
-    }
 
-    void checkIfIsAuthetificated() async {
-        SharedPreferences preferences = await SharedPreferences.getInstance();
-        if (preferences.getString('phoneNumber') == null || preferences.getString('password') == null) {
-            if (widget.step == 2 && widget.code != null) {
-                _codeController.text = widget.code.toString();
-            }
-        }
-        else {
-            Navigator.of(context).pushNamedAndRemoveUntil('/contacts', (_) => false);
+        if (widget.step == 2 && widget.code != null) {
+            _codeController.text = widget.code.toString();
         }
     }
 }

@@ -18,27 +18,48 @@ class ChatPageState extends State<ChatPage> {
         key: _scaffold,
         appBar: new AppBar(
             title: new Text(widget.title),
-            actions: [
-                new PopupMenuButton(
-                    itemBuilder: (_) => [
-                        new PopupMenuItem(
-                            value: 0,
-                            child: new Text('Settings'),
+        ),
+        body: new Column(
+            children: [
+                new Expanded(
+                    child: new ListView.builder(
+                        itemCount: 50,
+                        itemBuilder: (_, int index) => _messageView(index),
+                    )
+                ),
+                new Row(
+                    children: [
+                        new Expanded(
+                            child: new TextField(
+                                // maxLines: 2,
+                                keyboardType: TextInputType.multiline,
+                                decoration: new InputDecoration(
+                                    hintText: 'Message',
+                                    border: new OutlineInputBorder(
+                                        borderRadius: new BorderRadius.circular(100.0),
+                                        gapPadding: 0.0
+                                    )
+                                ),
+                            ),
+                        ),
+                        new IconButton(
+                            icon: new Icon(Icons.send),
+                            onPressed: () {
+                                print('send');
+                            },
                         )
                     ],
-                    onSelected: (int value) {
-                        print(value);
-                    },
                 )
             ],
-        ),
-        body: new Center(
-            child: new Text('chat'),
         )
     );
 
     @override
     void initState() {
         super.initState();
+    }
+
+    Widget _messageView(int index) {
+        return new Text(index.toString());
     }
 }
