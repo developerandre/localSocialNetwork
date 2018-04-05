@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:contacts_service/contacts_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:localsocialnetwork/pages/chat/chat.page.dart';
+import 'package:localsocialnetwork/utils.dart';
 
 
 class ContactsPage extends StatefulWidget {
     @override
-    ContactsPageState createState() => new ContactsPageState();
+    _ContactsPageState createState() => new _ContactsPageState();
 }
 
-class ContactsPageState extends State<ContactsPage> {
+class _ContactsPageState extends State<ContactsPage> {
     GlobalKey<ScaffoldState> _scaffold = new GlobalKey<ScaffoldState>();
     Iterable<Contact> _contacts = [];
     String _title = '';
@@ -24,11 +25,13 @@ class ContactsPageState extends State<ContactsPage> {
                     itemBuilder: (_) => [
                         new PopupMenuItem(
                             value: 0,
-                            child: new Text('Settings'),
-                        )
+                            child: new Text('Account'),
+                        ),
                     ],
                     onSelected: (int value) {
-                        print(value);
+                        if (value == 0) {
+                            Navigator.of(context).pushNamed(AppRoutes.account);
+                        }
                     },
                 )
             ],
@@ -56,16 +59,10 @@ class ContactsPageState extends State<ContactsPage> {
 
         SharedPreferences.getInstance()
         .then((SharedPreferences preferences) {
-            String phoneNumber = preferences.getString('phoneNumber');
-
-            if (phoneNumber == null) {
-                // Navigator.of(context).pus
-            }
-            else {
-                setState(() {
-                    _title = phoneNumber;
-                });
-            }
+            String phoneNumber = preferences.getString(AppPreferences.phoneNumber);
+            setState(() {
+                _title = phoneNumber;
+            });
         })
         .catchError((e) {
             print(e);

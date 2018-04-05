@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:localsocialnetwork/pages/contacts/contacts.page.dart';
-import 'package:localsocialnetwork/pages/sign-up/sign-up.page.dart';
+import 'package:localsocialnetwork/pages/auth/sign-in.page.dart';
+import 'package:localsocialnetwork/pages/account/account.page.dart';
+import 'package:localsocialnetwork/utils.dart';
 
 
 class MyApp extends StatelessWidget {
@@ -11,8 +13,9 @@ class MyApp extends StatelessWidget {
         title: 'Local Social Network',
         debugShowCheckedModeBanner: false,
         routes: {
-            '/contacts': (_) => new ContactsPage(),
-            '/sign-up': (_) => new SignUpPage(),
+            AppRoutes.contacts: (_) => new ContactsPage(),
+            AppRoutes.signIn: (_) => new SignInPage(),
+            AppRoutes.account: (_) => new AccountPage(),
         },
         theme: new ThemeData(
             primarySwatch: Colors.blue,
@@ -25,7 +28,11 @@ class MyApp extends StatelessWidget {
                         return snapshot.hasError ? new Text('hasError') : snapshot.data;
                     break;
                     case ConnectionState.waiting:
-                        return new Text('waiting');
+                        return new Scaffold(
+                            body: new Center(
+                                child: new CircularProgressIndicator(),
+                            ),
+                        );
                     break;
                     case ConnectionState.active:
                         return new Text('active');
@@ -42,10 +49,17 @@ class MyApp extends StatelessWidget {
     );
 
     Future<Widget> _getHomePage() async {
-        SharedPreferences preferences = await SharedPreferences.getInstance();
+        try {
+            SharedPreferences preferences = await SharedPreferences.getInstance();
 
-        if (preferences.getString('phoneNumber') == null || preferences.getString('password') == null)
-            return new SignUpPage();
-        else return new ContactsPage();
+            return (
+                preferences.getString(AppPreferences.phoneNumber) == null || 
+                preferences.getString(AppPreferences.password) == null
+            ) ? new SignInPage() : new ContactsPage();
+        }
+        catch (e) {
+            print(e);
+            return new Text(e.toString());
+        }
     }
 }

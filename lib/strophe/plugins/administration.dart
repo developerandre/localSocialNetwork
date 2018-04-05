@@ -1,0 +1,3 @@
+class Administration extends PluginClass{
+  
+}

@@ -480,15 +480,55 @@ class StropheConnection {
 
   Map<String, dynamic> _saslData;
 
-  bool doSession;
+  bool doSession = false;
 
-  bool doBind;
+  bool doBind = false;
   get register {
     return Strophe.connectionPlugins['register'];
   }
 
   get disco {
     return Strophe.connectionPlugins['disco'];
+  }
+
+  get caps {
+    return Strophe.connectionPlugins['caps'];
+  }
+
+  get muc {
+    return Strophe.connectionPlugins['muc'];
+  }
+
+  get bookmarks {
+    return Strophe.connectionPlugins['bookmarks'];
+  }
+
+  get lastactivity {
+    return Strophe.connectionPlugins['lastactivity'];
+  }
+
+  get pep {
+    return Strophe.connectionPlugins['pep'];
+  }
+
+  get privacy {
+    return Strophe.connectionPlugins['privacy'];
+  }
+
+  get pubsub {
+    return Strophe.connectionPlugins['pubsub'];
+  }
+
+  get private {
+    return Strophe.connectionPlugins['private'];
+  }
+
+  get vcard {
+    return Strophe.connectionPlugins['vcard'];
+  }
+
+  get chatstates {
+    return Strophe.connectionPlugins['chatstates'];
   }
 
   List<StanzaTimedHandler> timedHandlers;
@@ -509,17 +549,17 @@ class StropheConnection {
 
   StanzaTimedHandler _disconnectTimeout;
 
-  bool authenticated;
+  bool authenticated = false;
 
-  bool connected;
+  bool connected = false;
 
-  bool disconnecting;
+  bool disconnecting = false;
 
-  bool doAuthentication;
+  bool doAuthentication = false;
 
-  bool paused;
+  bool paused = false;
 
-  bool restored;
+  bool restored = false;
 
   List<dynamic> _data;
 
@@ -1286,7 +1326,7 @@ class StropheConnection {
                                                                                      *    The id used to send the IQ.
                                                                                     */
   sendIQ(xml.XmlNode el, [Function callback, Function errback, int timeout]) {
-    var timeoutHandler;
+    StanzaTimedHandler timeoutHandler;
     xml.XmlElement elem = el;
     if (el is xml.XmlDocument)
       elem = el.rootElement;
@@ -1300,9 +1340,11 @@ class StropheConnection {
     }
 
     if (callback != null || errback != null) {
+      print('has calback');
       var handler = this.addHandler((stanza) {
         // remove timeout handler if there is one
-        if (timeoutHandler) {
+        print(stanza);
+        if (timeoutHandler != null) {
           this.deleteTimedHandler(timeoutHandler);
         }
         String iqtype = elem.getAttribute("type");

@@ -7,10 +7,10 @@ class ChatPage extends StatefulWidget {
     ChatPage({this.title});
 
     @override
-    ChatPageState createState() => new ChatPageState();
+    _ChatPageState createState() => new _ChatPageState();
 }
 
-class ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> {
     GlobalKey<ScaffoldState> _scaffold = new GlobalKey<ScaffoldState>();
 
     @override
@@ -44,6 +44,7 @@ class ChatPageState extends State<ChatPage> {
                             onPressed: () {
                                 print('send');
                             },
+                            color: Theme.of(context).primaryColor,
                         )
                     ],
                 )

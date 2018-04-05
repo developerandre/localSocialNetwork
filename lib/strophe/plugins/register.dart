@@ -24,9 +24,9 @@ class RegisterPlugin extends PluginClass {
   String domain;
   String instructions;
   Map<String, dynamic> fields;
-  bool registered;
-  bool _registering;
-  bool processed_features;
+  bool registered = false;
+  bool _registering = false;
+  bool processed_features = false;
 
   Map<String, dynamic> _connect_cb_data = {};
   //The plugin must have the init function.
@@ -52,8 +52,8 @@ class RegisterPlugin extends PluginClass {
     if (conn.disco != null) {
       if (conn.disco.addFeature is Function)
         conn.disco.addFeature(Strophe.NS['REGISTER']);
-      if (conn.disco.addNode is Function)
-        conn.disco.addNode(Strophe.NS['REGISTER'], {'items': []});
+      //if (conn.disco.addNode is Function)
+      //conn.disco.addNode(Strophe.NS['REGISTER'], {'items': []});
     }
 
     // hooking strophe's connection.reset
@@ -344,13 +344,11 @@ class RegisterPlugin extends PluginClass {
         conn.changeConnectStatus(Strophe.Status['CONFLICT'], error);
       } else if (error == 'not-acceptable') {
         conn.changeConnectStatus(Strophe.Status['NOTACCEPTABLE'], error);
-      } else if (error == 'resource-constraint') {
+      } else {
         String text =
             Strophe.getText(errors[0].findElements('text').toList()[0]) +
-                '/resource-constraint';
+                '/$error';
         conn.changeConnectStatus(Strophe.Status['REGIFAIL'], text ?? error);
-      } else {
-        conn.changeConnectStatus(Strophe.Status['REGIFAIL'], error);
       }
     } else {
       Strophe.info("Registration successful.");

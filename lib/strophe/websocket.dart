@@ -464,8 +464,6 @@ class StropheWebSocket extends ServiceType {
     message = message as String;
     xml.XmlDocument elem;
     String data;
-
-    print(message);
     // check for closing stream
     String close = '<close xmlns="urn:ietf:params:xml:ns:xmpp-framing" />';
     if (message == close) {
