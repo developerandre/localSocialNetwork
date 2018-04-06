@@ -7,10 +7,10 @@ class ChatPage extends StatefulWidget {
     ChatPage({this.title});
 
     @override
-    ChatPageState createState() => new ChatPageState();
+    _ChatPageState createState() => new _ChatPageState();
 }
 
-class ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> {
     GlobalKey<ScaffoldState> _scaffold = new GlobalKey<ScaffoldState>();
 
     @override
@@ -18,27 +18,46 @@ class ChatPageState extends State<ChatPage> {
         key: _scaffold,
         appBar: new AppBar(
             title: new Text(widget.title),
-            actions: [
-                new PopupMenuButton(
-                    itemBuilder: (_) => [
-                        new PopupMenuItem(
-                            value: 0,
-                            child: new Text('Settings'),
+        ),
+        body: new Column(
+            children: [
+                new Expanded(
+                    child: new ListView.builder(
+                        itemCount: 50,
+                        itemBuilder: (_, int index) => _messageView(index),
+                    )
+                ),
+                new Divider(),
+                new Row(
+                    children: [
+                        new Expanded(
+                            child: new TextField(
+                                // maxLines: 2,
+                                // keyboardType: TextInputType.multiline,
+                                decoration: new InputDecoration(
+                                    hintText: 'Message',
+                                ),
+                            ),
+                        ),
+                        new IconButton(
+                            icon: new Icon(Icons.send),
+                            onPressed: () {
+                                print('send');
+                            },
+                            color: Theme.of(context).primaryColor,
                         )
                     ],
-                    onSelected: (int value) {
-                        print(value);
-                    },
                 )
             ],
-        ),
-        body: new Center(
-            child: new Text('chat'),
         )
     );
 
     @override
     void initState() {
         super.initState();
+    }
+
+    Widget _messageView(int index) {
+        return new Text(index.toString());
     }
 }
