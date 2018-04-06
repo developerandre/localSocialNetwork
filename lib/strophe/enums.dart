@@ -6,7 +6,20 @@ import 'dart:math';
 import 'package:localsocialnetwork/strophe/bosh.dart';
 import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/strophe/md5.dart';
+import 'package:localsocialnetwork/strophe/plugins/administration.dart';
+import 'package:localsocialnetwork/strophe/plugins/bookmark.dart';
+import 'package:localsocialnetwork/strophe/plugins/caps.dart';
+import 'package:localsocialnetwork/strophe/plugins/chat-notifications.dart';
+import 'package:localsocialnetwork/strophe/plugins/disco.dart';
+import 'package:localsocialnetwork/strophe/plugins/last-activity.dart';
+import 'package:localsocialnetwork/strophe/plugins/muc.dart';
+import 'package:localsocialnetwork/strophe/plugins/pep.dart';
 import 'package:localsocialnetwork/strophe/plugins/plugins.dart';
+import 'package:localsocialnetwork/strophe/plugins/privacy.dart';
+import 'package:localsocialnetwork/strophe/plugins/private-storage.dart';
+import 'package:localsocialnetwork/strophe/plugins/pubsub.dart';
+import 'package:localsocialnetwork/strophe/plugins/register.dart';
+import 'package:localsocialnetwork/strophe/plugins/vcard-temp.dart';
 import 'package:localsocialnetwork/strophe/sessionstorage.dart';
 import 'package:localsocialnetwork/strophe/sha1.dart';
 import 'package:localsocialnetwork/strophe/utils.dart';
@@ -101,6 +114,16 @@ class StanzaBuilder {
       return doc.rootElement;
     }
     return this.nodeTree;
+  }
+
+  xml.XmlElement get currentNode {
+    xml.XmlNode _currentNode = this.nodeTree.children[0];
+    for (int i = 1; i < this.node.length; i++) {
+      _currentNode = _currentNode.children[this.node[i]];
+    }
+    return _currentNode is xml.XmlDocument
+        ? _currentNode.rootElement
+        : _currentNode as xml.XmlElement;
   }
 
   /** Function: toString
@@ -227,12 +250,12 @@ class StanzaBuilder {
      *    The Strophe.Builder object.
      */
   StanzaBuilder cnode(xml.XmlNode elem) {
-    var newElem = Strophe.copyElement(elem);
+    xml.XmlNode newElem = Strophe.copyElement(elem);
     xml.XmlNode currentNode = this.nodeTree.children[0];
     for (int i = 1; i < this.node.length; i++) {
       currentNode = currentNode.children[this.node[i]];
     }
-    currentNode.children.add(Strophe.copyElement(newElem));
+    if (newElem != null) currentNode.children.add(Strophe.copyElement(newElem));
     this.node.add(currentNode.children.length - 1);
     return this;
   }
@@ -483,51 +506,55 @@ class StropheConnection {
   bool doSession = false;
 
   bool doBind = false;
-  get register {
+  RegisterPlugin get register {
     return Strophe.connectionPlugins['register'];
   }
 
-  get disco {
+  DiscoPlugin get disco {
     return Strophe.connectionPlugins['disco'];
   }
 
-  get caps {
+  AdministrationPlugin get admin {
+    return Strophe.connectionPlugins['admin'];
+  }
+
+  CapsPlugin get caps {
     return Strophe.connectionPlugins['caps'];
   }
 
-  get muc {
+  MucPlugin get muc {
     return Strophe.connectionPlugins['muc'];
   }
 
-  get bookmarks {
+  BookMarkPlugin get bookmarks {
     return Strophe.connectionPlugins['bookmarks'];
   }
 
-  get lastactivity {
+  LastActivity get lastactivity {
     return Strophe.connectionPlugins['lastactivity'];
   }
 
-  get pep {
+  PepPlugin get pep {
     return Strophe.connectionPlugins['pep'];
   }
 
-  get privacy {
+  PrivacyPlugin get privacy {
     return Strophe.connectionPlugins['privacy'];
   }
 
-  get pubsub {
+  PubsubPlugin get pubsub {
     return Strophe.connectionPlugins['pubsub'];
   }
 
-  get private {
+  PrivateStorage get private {
     return Strophe.connectionPlugins['private'];
   }
 
-  get vcard {
+  VCardTemp get vcard {
     return Strophe.connectionPlugins['vcard'];
   }
 
-  get chatstates {
+  ChatStatesNotificationPlugin get chatstates {
     return Strophe.connectionPlugins['chatstates'];
   }
 
@@ -1325,7 +1352,8 @@ class StropheConnection {
                                                                                      *  Returns:
                                                                                      *    The id used to send the IQ.
                                                                                     */
-  sendIQ(xml.XmlNode el, [Function callback, Function errback, int timeout]) {
+  String sendIQ(xml.XmlNode el,
+      [Function callback, Function errback, int timeout]) {
     StanzaTimedHandler timeoutHandler;
     xml.XmlElement elem = el;
     if (el is xml.XmlDocument)
@@ -1340,7 +1368,6 @@ class StropheConnection {
     }
 
     if (callback != null || errback != null) {
-      print('has calback');
       var handler = this.addHandler((stanza) {
         // remove timeout handler if there is one
         print(stanza);
@@ -1516,7 +1543,7 @@ class StropheConnection {
                                                                                                                                                                              *  Returns:
                                                                                                                                                                              *    A reference to the handler this can be used to remove it.
                                                                                                                                                                              */
-  addHandler(Function handler, String ns, String name,
+  StanzaHandler addHandler(Function handler, String ns, String name,
       [type, String id, String from, options]) {
     StanzaHandler hand =
         Strophe.Handler(handler, ns, name, type, id, from, options);

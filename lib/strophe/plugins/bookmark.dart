@@ -19,7 +19,7 @@ class BookMarkPlugin extends PluginClass {
 	 * @param {function} [success] - Callback after success
 	 * @param {function} [error] - Callback after error
 	 */
-  bool createBookmarksNode(Function success, [Function error]) {
+  bool createBookmarksNode([Function success, Function error]) {
     // We do this instead of using publish-options because this is not
     // mandatory to implement according to XEP-0060
     this.connection.sendIQ(
@@ -64,8 +64,8 @@ class BookMarkPlugin extends PluginClass {
 	 * @param {function} [success] - Callback after success
 	 * @param {function} [error] - Callback after error
 	 */
-  add(String roomJid, String alias, String nick,[ bool autojoin=true,
-      Function success, Function error]) {
+  add(String roomJid, String alias, String nick,
+      [bool autojoin = true, Function success, Function error]) {
     StanzaBuilder stanza = Strophe
         .$iq({'type': 'set'}).c('pubsub', {'xmlns': Strophe.NS['PUBSUB']}).c(
             'publish', {'node': Strophe.NS['BOOKMARKS']}).c('item', {

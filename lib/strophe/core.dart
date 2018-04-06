@@ -294,7 +294,7 @@ class Strophe {
      */
   static xml.XmlNode xmlTextNode(String text) {
     xml.XmlBuilder builder = Strophe.xmlGenerator();
-    builder.element('strophe', namespace: 'jabber:client', nest: text);
+    builder.element('strophe', nest: text);
     return builder.build();
   }
 
@@ -356,11 +356,13 @@ class Strophe {
      *    A new, copied DOM element tree.
      */
   static xml.XmlNode copyElement(xml.XmlNode elem) {
-    var el;
+    var el = elem;
     if (elem.nodeType == xml.XmlNodeType.ELEMENT) {
       el = elem.copy();
     } else if (elem.nodeType == xml.XmlNodeType.TEXT) {
       el = elem;
+    } else if (elem.nodeType == xml.XmlNodeType.DOCUMENT) {
+      el = elem.document.rootElement;
     }
     return el;
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/strophe/enums.dart';
 import 'package:localsocialnetwork/strophe/plugins/plugins.dart';
@@ -28,13 +30,15 @@ class CapsPlugin extends PluginClass {
   }
 
   sendPres() {
-    return this.connection.send(Strophe.$pres().cnode(createCapsNode().tree()));
+    createCapsNode().then((caps) {
+      return this.connection.send(Strophe.$pres().cnode(caps.tree()));
+    });
   }
 
-  StanzaBuilder createCapsNode() {
+  Future<StanzaBuilder> createCapsNode() async {
     String node;
     if (this.connection.disco.identities.length > 0) {
-      node = this.connection.disco.identities[0].name ?? "";
+      node = this.connection.disco.identities[0]['name'] ?? "";
     } else {
       node = this._node;
     }
@@ -42,7 +46,7 @@ class CapsPlugin extends PluginClass {
       'xmlns': Strophe.NS['CAPS'],
       'hash': this._hash,
       'node': node,
-      'ver': generateVerificationString()
+      'ver': await generateVerificationString()
     });
   }
 

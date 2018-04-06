@@ -1,20 +1,21 @@
 import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/strophe/enums.dart';
 import 'package:localsocialnetwork/strophe/plugins/plugins.dart';
+import 'package:xml/xml.dart';
 
 class PrivacyPlugin extends PluginClass {
   /** Variable: lists
    *  Available privacy lists
    */
-  var lists = {};
+  Map<String, PrivacyList> lists = {};
   /** PrivateVariable: _default
    *  Default privacy list
    */
-  var _default = null;
+  String _default = null;
   /** PrivateVariable: _active
    *  Active privacy list
    */
-  var _active = null;
+  String _active = null;
   /** PrivateVariable: _isInitialized
    *  If lists were pulled from the server, and plugin is ready to work with those.
    */
@@ -41,32 +42,41 @@ class PrivacyPlugin extends PluginClass {
    *    (Function) failCallback - Called upon fail deletion.
    *    (Function) listChangeCallback - Called upon list change.
    */
-  getListNames(successCallback, failCallback, listChangeCallback) {
+  getListNames(
+      [Function successCallback,
+      Function failCallback,
+      Function listChangeCallback]) {
     this._listChangeCallback = listChangeCallback;
     this.connection.sendIQ(
         Strophe.$iq({
           'type': "get",
           'id': this.connection.getUniqueId("privacy")
-        }).c("query", {'xmlns': Strophe.NS['PRRIVACY']}).tree(), (stanza) {
-      var _lists = this.lists;
+        }).c("query", {'xmlns': Strophe.NS['PRIVACY']}).tree(),
+        (XmlNode element) {
+      XmlElement stanza;
+      if (element is XmlDocument)
+        stanza = element.rootElement;
+      else
+        stanza = element as XmlElement;
+      Map<String, PrivacyList> _lists = this.lists;
       this.lists = {};
-      var listNames = stanza.getElementsByTagName("list");
+      List<XmlElement> listNames = stanza.findAllElements("list").toList();
       for (int i = 0; i < listNames.length; ++i) {
-        var listName = listNames[i].getAttribute("name");
+        String listName = listNames[i].getAttribute("name");
         if (_lists[listName] != null)
           this.lists[listName] = _lists[listName];
         else
           this.lists[listName] = new PrivacyList(listName, false);
         this.lists[listName]._isPulled = false;
       }
-      var activeNode = stanza.getElementsByTagName("active");
+      List<XmlElement> activeNode = stanza.findAllElements("active").toList();
       if (activeNode.length == 1)
         this._active = activeNode[0].getAttribute("name");
-      var defaultNode = stanza.getElementsByTagName("default");
+      List<XmlElement> defaultNode = stanza.findAllElements("default").toList();
       if (defaultNode.length == 1)
         this._default = defaultNode[0].getAttribute("name");
       this._isInitialized = true;
-      if (successCallback)
+      if (successCallback != null)
         try {
           successCallback();
         } catch (e) {
@@ -85,7 +95,7 @@ class PrivacyPlugin extends PluginClass {
    *  Returns:
    *    New list, or existing list if it exists.
    */
-  newList(name) {
+  PrivacyList newList(String name) {
     if (this.lists[name] == null)
       this.lists[name] = new PrivacyList(name, true);
     return this.lists[name];
@@ -104,8 +114,9 @@ class PrivacyPlugin extends PluginClass {
    *  Returns:
    *    New list, or existing list if it exists.
    */
-  newItem(type, value, action, order, blocked) {
-    var item = new Item();
+  PrivacyItem newItem(String type, String value, String action, int order,
+      List<String> blocked) {
+    PrivacyItem item = new PrivacyItem();
     item.type = type;
     item.value = value;
     item.action = action;
@@ -122,7 +133,8 @@ class PrivacyPlugin extends PluginClass {
    *    (Function) successCallback - Called upon successful deletion.
    *    (Function) failCallback - Called upon fail deletion.
    */
-  deleteList(name, successCallback, failCallback) {
+  deleteList(String name, Function successCallback, Function failCallback) {
+    name = name ?? '';
     this.connection.sendIQ(
         Strophe.$iq({
           'type': "set",
@@ -130,7 +142,7 @@ class PrivacyPlugin extends PluginClass {
         }).c("query", {'xmlns': Strophe.NS['PRIVACY']}).c(
             "list", {'name': name}).tree(), () {
       this.lists.remove(name);
-      if (successCallback)
+      if (successCallback != null)
         try {
           successCallback();
         } catch (e) {
@@ -150,33 +162,35 @@ class PrivacyPlugin extends PluginClass {
    *  Returns:
    *    True if list is ok, and is sent to server, false otherwise.
    */
-  saveList(name, successCallback, failCallback) {
+  saveList(String name, [Function successCallback, Function failCallback]) {
     if (this.lists[name] == null) {
       Strophe.error("Trying to save uninitialized list");
-      throw {'error': "List not found"};
+      //throw {'error': "List not found"};
+      this.newList(name);
     }
-    var listModel = this.lists[name];
+    PrivacyList listModel = this.lists[name];
     if (!listModel.validate()) return false;
-    var listIQ = Strophe
+    StanzaBuilder listIQ = Strophe
         .$iq({'type': "set", 'id': this.connection.getUniqueId("privacy")});
     StanzaBuilder list = listIQ
-        .c("query", {'xmlns': Strophe.NS['PRIVACY']}).c("list", {name: name});
-    var count = listModel.items.length;
+        .c("query", {'xmlns': Strophe.NS['PRIVACY']}).c("list", {'name': name});
+
+    int count = listModel.items.length;
     for (int i = 0; i < count; ++i) {
-      var item = listModel.items[i];
-      var itemNode =
-          list.c("item", {'action': item.action, 'order': item.order});
+      PrivacyItem item = listModel.items[i];
+      StanzaBuilder itemNode = list
+          .c("item", {'action': item.action, 'order': item.order.toString()});
       if (item.type != "")
         itemNode.attrs({'type': item.type, 'value': item.value});
-      if (item.blocked && item.blocked.length > 0) {
-        var blockCount = item.blocked.length;
-        for (var j = 0; j < blockCount; ++j) itemNode.c(item.blocked[j]).up();
+      if (item.blocked != null && item.blocked.length > 0) {
+        int blockCount = item.blocked.length;
+        for (int j = 0; j < blockCount; ++j) itemNode.c(item.blocked[j]).up();
       }
       itemNode.up();
     }
     this.connection.sendIQ(listIQ.tree(), () {
       listModel._isPulled = true;
-      if (successCallback)
+      if (successCallback != null)
         try {
           successCallback();
         } catch (e) {
@@ -194,38 +208,44 @@ class PrivacyPlugin extends PluginClass {
    *    (Function) successCallback - Called upon successful load.
    *    (Function) failCallback - Called upon fail load.
    */
-  loadList(name, successCallback, failCallback) {
+  loadList(String name, [Function successCallback, Function failCallback]) {
+    name = name ?? '';
     this.connection.sendIQ(
         Strophe.$iq({
           'type': "get",
           'id': this.connection.getUniqueId("privacy")
         }).c("query", {'xmlns': Strophe.NS['PRIVACY']}).c(
-            "list", {'name': name}).tree(), (stanza) {
-      var lists = stanza.getElementsByTagName("list");
-      var listsSize = lists.length;
-      for (var i = 0; i < listsSize; ++i) {
-        var list = lists[i];
-        var listModel = this.newList(list.getAttribute("name"));
+            "list", {'name': name}).tree(), (XmlNode element) {
+      XmlElement stanza;
+      if (element is XmlDocument)
+        stanza = element.rootElement;
+      else
+        stanza = element as XmlElement;
+      List<XmlElement> lists = stanza.findAllElements("list").toList();
+      int listsSize = lists.length;
+      for (int i = 0; i < listsSize; ++i) {
+        XmlElement list = lists[i];
+        PrivacyList listModel = this.newList(list.getAttribute("name"));
         listModel.items = [];
-        var items = list.getElementsByTagName("item");
-        var itemsSize = items.length;
-        for (var j = 0; j < itemsSize; ++j) {
-          var item = items[j];
-          var blocks = [];
-          var blockNodes = item.childNodes;
-          var nodesSize = blockNodes.length;
-          for (var k = 0; k < nodesSize; ++k)
-            blocks.add(blockNodes[k].nodeName);
-          listModel.items.push(this.newItem(
+        List<XmlElement> items = list.findAllElements("item").toList();
+        int itemsSize = items.length;
+        for (int j = 0; j < itemsSize; ++j) {
+          XmlElement item = items[j];
+          List<String> blocks = [];
+          List<XmlNode> blockNodes = item.children;
+          int nodesSize = blockNodes.length;
+          for (int k = 0; k < nodesSize; ++k)
+            blocks.add((blockNodes[k] as XmlElement).name.qualified);
+          listModel.items.add(this.newItem(
               item.getAttribute('type'),
               item.getAttribute('value'),
               item.getAttribute('action'),
-              item.getAttribute('order'),
+              int.parse(item.getAttribute('order')) ?? 0,
               blocks));
         }
       }
       this.lists[name];
-      if (successCallback)
+      if (successCallback != null)
         try {
           successCallback();
         } catch (e) {
@@ -242,14 +262,14 @@ class PrivacyPlugin extends PluginClass {
    *    (Function) successCallback - Called upon successful setting.
    *    (Function) failCallback - Called upon fail setting.
    */
-  setActive(String name, successCallback, failCallback) {
+  setActive(String name, [Function successCallback, Function failCallback]) {
     StanzaBuilder iq = Strophe
         .$iq({'type': "set", 'id': this.connection.getUniqueId("privacy")}).c(
             "query", {'xmlns': Strophe.NS['PRIVACY']}).c("active");
     if (name != null && name.isNotEmpty) iq.attrs({'name': name});
     this.connection.sendIQ(iq.tree(), () {
       this._active = name;
-      if (successCallback)
+      if (successCallback != null)
         try {
           successCallback();
         } catch (e) {
@@ -262,7 +282,7 @@ class PrivacyPlugin extends PluginClass {
   /** Function: getActive
    *  Returns currently active list of null.
    */
-  getActive() {
+  String getActive() {
     return this._active;
   }
 
@@ -274,14 +294,14 @@ class PrivacyPlugin extends PluginClass {
    *    (Function) successCallback - Called upon successful setting.
    *    (Function) failCallback - Called upon fail setting.
    */
-  setDefault(String name, successCallback, failCallback) {
+  setDefault(String name, [Function successCallback, Function failCallback]) {
     StanzaBuilder iq = Strophe
         .$iq({'type': "set", 'id': this.connection.getUniqueId("privacy")}).c(
             "query", {'xmlns': Strophe.NS['PRIVACY']}).c("default");
-    if (name != null && name.isNotEmpty) iq.attrs({name: name});
+    if (name != null && name.isNotEmpty) iq.attrs({'name': name});
     this.connection.sendIQ(iq.tree(), () {
       this._default = name;
-      if (successCallback)
+      if (successCallback != null)
         try {
           successCallback();
         } catch (e) {
@@ -294,51 +314,51 @@ class PrivacyPlugin extends PluginClass {
   /** Function: getDefault
    *  Returns currently default list of null.
    */
-  getDefault() {
+  String getDefault() {
     return this._default;
   }
 }
 
 /**
- * Class: Item
+ * Class: PrivacyItem
  * Describes single rule.
  */
-class Item {
+class PrivacyItem {
   /** Variable: type
    *  One of [jid, group, subscription].
    */
-  var type = null;
-  var value = null;
+  String type;
+  String value;
   /** Variable: action
    *  One of [allow, deny].
    *
    *  Not null. Action to be execute.
    */
-  var action = null;
+  String action;
   /** Variable: order
    *  The order in which privacy list items are processed.
    *
    *  Unique, not-null, non-negative integer.
    */
-  var order = null;
+  int order;
   /** Variable: blocked
    *  List of blocked stanzas.
    *
    *  One or more of [message, iq, presence-in, presence-out]. Empty set is equivalent to all.
    */
-  var blocked = [];
+  List<String> blocked = [];
   /** Function: validate
  *  Checks if item is of valid structure
  */
-  validate() {
+  bool validate() {
     if (["jid", "group", "subscription", ""].indexOf(this.type) < 0)
       return false;
     if (this.type == "subscription") {
       if (["both", "to", "from", "none"].indexOf(this.value) < 0) return false;
     }
     if (["allow", "deny"].indexOf(this.action) < 0) return false;
-    bool hasMatch = new RegExp(r"^\d+$").hasMatch(this.order);
-    if (!this.order || !hasMatch) return false;
+    bool hasMatch = new RegExp(r"^\d+$").hasMatch(this.order.toString());
+    if (this.order == 0 || !hasMatch) return false;
     if (this.blocked.length > 0) {
       //if(typeof(this.blocked) != "object") return false;
       List<String> possibleBlocks = [
@@ -347,7 +367,7 @@ class Item {
         "presence-in",
         "presence-out"
       ];
-      var blockCount = this.blocked.length;
+      int blockCount = this.blocked.length;
       for (int i = 0; i < blockCount; ++i) {
         if (possibleBlocks.indexOf(this.blocked[i]) < 0) return false;
         possibleBlocks.remove(this.blocked[i]);
@@ -359,12 +379,12 @@ class Item {
 /** Function: copy
  *  Copy one item into another.
  */
-  copy(item) {
+  copy(PrivacyItem item) {
     this.type = item.type;
     this.value = item.value;
     this.action = item.action;
     this.order = item.order;
-    this.blocked = item.blocked.slice();
+    this.blocked = item.blocked.getRange(0, item.blocked.length).toList();
   }
 }
 
@@ -379,21 +399,21 @@ class PrivacyList {
    *
    *  Not changeable. Create new, copy this one, and delete, if you wish to rename.
    */
-  var _name;
+  String _name;
   /** PrivateVariable: _isPulled
    *  If list is pulled from server and up to date.
    *
    *  Is false upon first getting of list of lists, or after getting stanza about update
    */
-  var _isPulled;
+  bool _isPulled;
   /** Variable: items
    *  Items of this list.
    */
-  var items = [];
+  List<PrivacyItem> items = [];
   /** Function: getName
  *  Returns list name
  */
-  getName() {
+  String getName() {
     return this._name;
   }
 
@@ -404,18 +424,21 @@ class PrivacyList {
  * Also this is possible when list was changed somewhere else, and you've got announcement about update. Same loadList
  * is your savior.
  */
-  isPulled() {
+  bool isPulled() {
     return this._isPulled;
   }
 
 /** Function: validate
  *  Checks if list is of valid structure
  */
-  validate() {
-    var orders = [];
-    var itemCount = this.items.length;
-    for (var i = 0; i < itemCount; ++i) {
-      if (!this.items[i].validate()) return false;
+  bool validate() {
+    List<int> orders = [];
+    this.items = this.items.where((PrivacyItem item) {
+      return item != null;
+    }).toList();
+    int itemCount = this.items.length;
+    for (int i = 0; i < itemCount; ++i) {
+      if (this.items[i] == null || !this.items[i].validate()) return false;
       if (orders.indexOf(this.items[i].order) >= 0) return false;
       orders.add(this.items[i].order);
     }
@@ -428,11 +451,11 @@ class PrivacyList {
  *  Params:
  *    (List) list - list to copy items from.
  */
-  copy(list) {
+  copy(PrivacyList list) {
     this.items = [];
-    var l = list.items.length;
-    for (var i = 0; i < l; ++i) {
-      this.items[i] = new Item();
+    int l = list.items.length;
+    for (int i = 0; i < l; ++i) {
+      this.items[i] = new PrivacyItem();
       this.items[i].copy(list.items[i]);
     }
   }
