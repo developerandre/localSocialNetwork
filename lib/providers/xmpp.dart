@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:localsocialnetwork/providers/models.dart';
 import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/strophe/enums.dart';
 import 'package:localsocialnetwork/strophe/plugins/administration.dart';
@@ -17,6 +18,7 @@ import 'package:localsocialnetwork/strophe/plugins/private-storage.dart';
 import 'package:localsocialnetwork/strophe/plugins/pubsub.dart';
 import 'package:localsocialnetwork/strophe/plugins/register.dart';
 import 'package:localsocialnetwork/strophe/plugins/vcard-temp.dart';
+import 'package:xml/xml.dart' as xml;
 
 class ConnexionStatus {
   int status;
@@ -29,7 +31,7 @@ class XmppProvider {
   static XmppProvider _instance;
   String _mucService = '';
   StropheConnection _connection;
-  String _host = '192.168.43.45';
+  String _host = '192.168.20.192';
   String _domain = "localhost";
   String _pass = "jesuis123";
   String _jid;
@@ -87,7 +89,7 @@ class XmppProvider {
   }
 
   String _formatToJid(String phone, [String domain]) {
-    if (domain != null || domain.isEmpty) domain = this._domain;
+    if (domain == null || domain.isEmpty) domain = this._domain;
     if (phone != null && phone.indexOf("@$domain") != -1) {
       return phone;
     }
@@ -111,6 +113,7 @@ class XmppProvider {
       if (!streamController.isClosed)
         streamController.add(new ConnexionStatus(status, condition, ele));
       if (status == Strophe.Status['CONNECTED']) {
+        print("is Connect");
         this.jid = jid;
         this.handleAfterConnect();
         streamController.close();
@@ -160,20 +163,86 @@ class XmppProvider {
 
   handleAfterConnect() {
     this.sendPresence();
-    this.unsubscribeToPep("myNode2");
     this.getRoster();
     this.handlePresence();
+    this.handlePepMessage();
+    this.handleHeadlineMessage();
+    this.handleEventsMessage();
+    this.handleInviteMessage();
     this.handleMessage();
     this.handleGroupMessage();
+    this.handleComposingMessage();
     this.handleNormalMessage();
   }
 
   void getRoster() {}
   void handlePresence() {
     this._connection.addHandler((presence) {
-      print(presence.runtimeType);
       return true;
     }, null, 'presence');
+  }
+
+  void handleInviteMessage() {
+    this._connection.addHandler((xml.XmlElement msg) {
+      print(msg);
+      String from = msg.getAttribute('from');
+      String domain = Strophe.getDomainFromJid(from);
+      String sender, room;
+      if (domain == this._mucService) {
+        room = Strophe.getNodeFromJid(from);
+        //is mediated invitation
+        List<xml.XmlElement> invites = msg.findAllElements('invite').toList();
+        if (invites.length > 0) {
+          xml.XmlElement invite = invites[0];
+          sender = Strophe.getBareJidFromJid(invite.getAttribute('from'));
+        }
+        if (room != null && sender != null) {
+          ContactNotification notification = new ContactNotification();
+          notification.content =
+              '$sender vous invite à rejoindre le groupe $room';
+          notification.from = sender;
+          notification.notificationType = NotificationType.GROUP_INVITATION;
+        }
+      } else if (domain == this._domain) {
+        // is directed invitation
+
+      }
+      return true;
+    }, Strophe.NS['MUC_USER'], 'message');
+  }
+
+  void handleEventsMessage() {
+    this._connection.addHandler((xml.XmlElement msg) {
+      print(msg);
+      return true;
+    }, Strophe.NS['PUBSUB_EVENT'], 'message');
+  }
+
+  void handleHeadlineMessage() {
+    this._connection.addHandler((xml.XmlElement msg) {
+      print(msg);
+      if (!_namespaceMatch(msg, Strophe.NS['PUBSUB']) &&
+          !_namespaceMatch(msg, Strophe.NS['PUBSUB_EVENT'])) {}
+      return true;
+    }, null, 'message', 'headline');
+  }
+
+  void handlePepMessage() {
+    this._connection.addHandler((xml.XmlElement msg) {
+      print(msg);
+      return true;
+    }, Strophe.NS['PUBSUB'], 'message', 'headline');
+  }
+
+  void handleComposingMessage() {
+    this._connection.addHandler((xml.XmlElement msg) {
+      print(msg);
+      String from = msg.getAttribute('from');
+      List<xml.XmlElement> composing =
+          msg.findAllElements('composing').toList();
+      if (composing.length > 0) {}
+      return true;
+    }, Strophe.NS['CHATSTATES'], 'message', ['chat', 'groupchat']);
   }
 
   void handleGroupMessage() {
@@ -203,6 +272,7 @@ class XmppProvider {
   }
 
   getLastActivity(String jid) {
+    jid = this._formatToJid(jid);
     this._connection.lastactivity.getLastActivity(jid, (iq) {}, (err) {});
   }
 
@@ -280,6 +350,7 @@ class XmppProvider {
   }
 
   setCanalAffiliations(String node, String jid, String affiliation) {
+    jid = this._formatToJid(jid);
     this._connection.pubsub.setAffiliation(node, jid, affiliation, (iq) {});
   }
 
@@ -288,6 +359,7 @@ class XmppProvider {
   }
 
   unsubscribeToCanal(String node, String jid) {
+    jid = this._formatToJid(jid);
     this._connection.pubsub.unsubscribe(node, jid, null, (iq) {}, (err) {});
   }
 
@@ -359,6 +431,7 @@ class XmppProvider {
   }
 
   getvCard([String jid]) {
+    jid = this._formatToJid(jid);
     this._connection.vcard.get(
         (iq) {
           print("getvCard: $iq");
@@ -370,6 +443,7 @@ class XmppProvider {
   }
 
   setvCard(VCardEl ele, [String jid]) {
+    jid = this._formatToJid(jid);
     this._connection.vcard.set(
         (iq) {
           print(iq);
@@ -411,7 +485,7 @@ class XmppProvider {
     });
   }
 
-  joinGroup(String name, String nick) {
+  joinGroup(String name, [String nick]) {
     if (!this._connection.connected) return;
     nick = nick ?? Strophe.getNodeFromJid(this.jid);
     if (name == null || name.isEmpty || nick == null || nick.isEmpty) return;
@@ -438,6 +512,10 @@ class XmppProvider {
   }
 
   multipleInvites(String room, List<String> jids) {
+    jids = jids.map((String jid) {
+      return this._formatToJid(jid);
+    }).toList();
+    room = this._formatToJid(room, this._mucService);
     this
         ._connection
         .muc
@@ -461,24 +539,35 @@ class XmppProvider {
     }
   }
 
+  getGroupAffiliations(String room, [String affiliation = 'member']) {
+    room = this._formatToJid(room, this._mucService);
+    StanzaBuilder el = Strophe
+        .$iq({'type': 'get', 'to': room, 'from': this._connection.jid}).c(
+            'query', {'xmlns': 'http://jabber.org/protocol/muc#admin'});
+    el.c('item', {'affiliation': affiliation});
+    this._connection.sendIQ(el.tree(), (iq) {
+      print(iq);
+    }, (err) {
+      print(err);
+    });
+  }
+
   setTopic(String room, String topic) {
+    room = this._formatToJid(room, this._mucService);
     this._connection.muc.setTopic(room, topic);
   }
 
   getUserGroup([String jid, node = 'http://jabber.org/protocol/muc#rooms']) {
     jid = jid ?? this.jid;
-    this._connection.disco.items(
-        jid,
-        node,
-        (result) => {
-              // console.log(result)
-            },
-        (error) => {
-              // console.log(error)
-            });
+    jid = this._formatToJid(jid);
+    this._connection.disco.items(jid, node, (result) {
+      print('user room $result');
+    }, (error) {
+      // console.log(error)
+    });
   }
 
-  createConfiguredRoom(String name, List members) {
+  createConfiguredRoom(String name, [List<String> members]) {
     name = name ?? '';
     name = name.replaceAll(new RegExp(' '), '_');
     name = name.replaceAll(new RegExp('[éèêë]'), 'e');
@@ -491,13 +580,14 @@ class XmppProvider {
       "muc#roomconfig_roomdesc": name + ' group',
       "muc#roomconfig_whois": "anyone",
       "muc#roomconfig_roomname": name,
-      "muc#roomconfig_persistentroom": "1"
+      "muc#roomconfig_persistentroom": "1",
+      "muc#roomconfig_membersonly": "1"
     };
 
     if (!this._connection.connected) return;
     this._connection.muc.createConfiguredRoom(room, config, (iqSuccess) {
-      // console.log(room, ' crée avec success');
-      // console.log(iqSuccess);
+      print('$room crée avec success');
+      print(iqSuccess);
       if (members != null && members.length > 0) {
         members.forEach((member) {
           this.modifyGroupAffiliation(room, member);
@@ -507,16 +597,18 @@ class XmppProvider {
       this.joinGroup(room, Strophe.getNodeFromJid(this.jid));
       this.setTopic(room, name);
     }, (iqError) {
-      // console.log(room, ' non crée');
-      // console.log(iqError);
+      print('$room non crée');
+      print(iqError);
     });
   }
 
   leaveGroup(String room, String nick) {
+    room = this._formatToJid(room, this._mucService);
     this._connection.muc.leave(room, nick, () => {});
   }
 
   getConfigOfGroup(String room) {
+    room = this._formatToJid(room, this._mucService);
     StanzaBuilder iq = Strophe.Builder('iq', attrs: {
       'from': this.jid,
       'id': this._connection.getUniqueId(),
@@ -524,17 +616,15 @@ class XmppProvider {
       'type': 'get'
     });
     iq.c('query', {'xmlns': 'http://jabber.org/protocol/muc#owner'});
-    this._connection.sendIQ(
-        iq.tree(),
-        (iq) => {
-              // console.log(iq);
-            },
-        (iqError) => {
-              // console.log(iqError);
-            });
+    this._connection.sendIQ(iq.tree(), (iq) {
+      print(iq.toString());
+    }, (iqError) {
+      print(iqError);
+    });
   }
 
   destroyGroup(String room, [String reason = 'Envie de détruire le groupe']) {
+    room = this._formatToJid(room, this._mucService);
     StanzaBuilder iq = Strophe.Builder('iq', attrs: {
       'from': this.jid,
       'id': this._connection.getUniqueId(),
@@ -557,6 +647,7 @@ class XmppProvider {
   }
 
   modifyGroupAffiliation(String room, String jid, [String type = 'member']) {
+    room = this._formatToJid(room, this._mucService);
     switch (type) {
       case 'member':
         this._connection.muc.member(
@@ -605,16 +696,18 @@ class XmppProvider {
     });
   }
 
-  addOrUpdateBookmark(String roomJid, String alias, String nick,
-      [bool autojoin = true]) {
+  addOrUpdateBookmark(String roomJid, String alias,
+      [String nick, bool autojoin = true]) {
+    roomJid = this._formatToJid(roomJid, this._mucService);
     this._connection.bookmarks.add(roomJid, alias, nick, autojoin, (iq) {
-      print("$iq");
+      print("addOrUpdateBookmark $iq");
     }, (err) {
-      print(err);
+      print("addOrUpdateBookmark error $err");
     });
   }
 
   deleteBookmark(String roomJid) {
+    roomJid = this._formatToJid(roomJid, this._mucService);
     this._connection.bookmarks.delete(roomJid, (iq) {
       print("deleteBookmark $iq");
     }, (err) {
@@ -631,6 +724,7 @@ class XmppProvider {
   }
 
   discoveryItemsFor(String jid, [String node]) {
+    jid = this._formatToJid(jid);
     this._connection.disco.items(jid, node, (iq) {
       print(iq);
     }, (err) {
@@ -639,10 +733,12 @@ class XmppProvider {
   }
 
   discoveryInfosFor(String jid, [String node]) {
+    jid = this._formatToJid(jid);
     this._connection.disco.info(jid, node, (iq) {}, (err) {});
   }
 
   addDiscoveryItem(String jid, String name, String node, [Function callback]) {
+    jid = this._formatToJid(jid);
     this._connection.disco.addItem(jid, name, node, callback);
   }
 
@@ -663,5 +759,27 @@ class XmppProvider {
     if (this._connection.connected) return;
     this._connection.disconnect(reason);
     this._connection = Strophe.Connection(this._url);
+  }
+
+  bool _namespaceMatch(xml.XmlNode elem, String ns) {
+    bool nsMatch = false;
+    if (ns == null || ns.isEmpty) {
+      return true;
+    } else {
+      Strophe.forEachChild(elem, null, (elem) {
+        if (this._getNamespace(elem) == ns) {
+          nsMatch = true;
+        }
+      });
+      nsMatch = nsMatch || _getNamespace(elem) == ns;
+    }
+    return nsMatch;
+  }
+
+  String _getNamespace(xml.XmlNode node) {
+    xml.XmlElement elem =
+        node is xml.XmlDocument ? node.rootElement : node as xml.XmlElement;
+    String elNamespace = elem.getAttribute("name") ?? '';
+    return elNamespace;
   }
 }

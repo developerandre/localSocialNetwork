@@ -86,7 +86,7 @@ class StropheWebSocket extends ServiceType {
     if (errors.length == 0) {
       return false;
     }
-    var error = errors.elementAt(0);
+    xml.XmlElement error = errors.elementAt(0);
 
     String condition = "";
     String text = "";
@@ -177,7 +177,7 @@ class StropheWebSocket extends ServiceType {
   }
 
   _connectCb(bodyWrap) {
-    var error = this._checkStreamError(bodyWrap, Strophe.Status['CONNFAIL']);
+    bool error = this._checkStreamError(bodyWrap, Strophe.Status['CONNFAIL']);
     if (error) {
       return Strophe.Status['CONNFAIL'];
     }
@@ -416,7 +416,7 @@ class StropheWebSocket extends ServiceType {
   }
 
   void _onIdle() {
-    var data = this._conn.data;
+    List data = this._conn.data;
     if (data.length > 0 && !this._conn.paused) {
       for (int i = 0; i < data.length; i++) {
         if (data[i] != null) {

@@ -7,7 +7,7 @@ class Utils {
   static String utf16to8(String str) {
     int c;
     String out = "";
-    var len = str.length;
+    int len = str.length;
     for (int i = 0; i < len; i++) {
       c = str.codeUnitAt(i);
       if ((c >= 0x0000) && (c <= 0x007F)) {

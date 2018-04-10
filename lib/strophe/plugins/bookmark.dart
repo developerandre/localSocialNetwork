@@ -64,8 +64,8 @@ class BookMarkPlugin extends PluginClass {
 	 * @param {function} [success] - Callback after success
 	 * @param {function} [error] - Callback after error
 	 */
-  add(String roomJid, String alias, String nick,
-      [bool autojoin = true, Function success, Function error]) {
+  add(String roomJid, String alias,
+      [String nick, bool autojoin = true, Function success, Function error]) {
     StanzaBuilder stanza = Strophe
         .$iq({'type': 'set'}).c('pubsub', {'xmlns': Strophe.NS['PUBSUB']}).c(
             'publish', {'node': Strophe.NS['BOOKMARKS']}).c('item', {
@@ -148,7 +148,7 @@ class BookMarkPlugin extends PluginClass {
 	 * @param {function} [success] - Callback after success
 	 * @param {function} [error] - Callback after error
 	 */
-  get(Function success, Function error) {
+  get([Function success, Function error]) {
     this.connection.sendIQ(
         Strophe.$iq({'type': 'get'}).c('pubsub', {
           'xmlns': Strophe.NS['PUBSUB']
@@ -167,7 +167,7 @@ class BookMarkPlugin extends PluginClass {
 	 * @param {function} [success] - Callback after success
 	 * @param {function} [error] - Callback after error
 	 */
-  delete(String roomJid, Function success, Function error) {
+  delete(String roomJid, [Function success, Function error]) {
     StanzaBuilder stanza = Strophe
         .$iq({'type': 'set'}).c('pubsub', {'xmlns': Strophe.NS['PUBSUB']}).c(
             'publish', {'node': Strophe.NS['BOOKMARKS']}).c('item', {

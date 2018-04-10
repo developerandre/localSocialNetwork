@@ -83,7 +83,7 @@ class MucPlugin extends PluginClass {
         XmppRoom roomAt = this.rooms[roomname];
         Map handlers = {};
         if (stanza.name.qualified == "message") {
-          handlers = roomAt._message_handlers;
+          if (roomAt != null) handlers = roomAt._message_handlers;
         } else if (stanza.name.qualified == "presence") {
           List<XmlElement> xquery = stanza.findAllElements("x").toList();
           if (xquery.length > 0) {
@@ -94,7 +94,7 @@ class MucPlugin extends PluginClass {
               xmlns = x.getAttribute("xmlns");
               if (xmlns != null &&
                   new RegExp(xmlns).hasMatch(Strophe.NS['MUC'])) {
-                handlers = roomAt._presence_handlers;
+                if (roomAt != null) handlers = roomAt._presence_handlers;
                 break;
               }
             }
@@ -500,7 +500,7 @@ class MucPlugin extends PluginClass {
   modifyAffiliation(String room, String jid, String affiliation,
       [String reason, Function handlerCb, Function errorCb]) {
     StanzaBuilder item =
-        Strophe.$build("item", {jid: jid, affiliation: affiliation});
+        Strophe.$build("item", {'jid': jid, 'affiliation': affiliation});
     return this._modifyPrivilege(room, item, reason, handlerCb, errorCb);
   }
 

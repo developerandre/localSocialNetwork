@@ -84,7 +84,7 @@ class ChatStatesNotificationPlugin extends PluginClass {
     this._sendNotification(jid, type, 'gone');
   }
 
-  _sendNotification(String jid, String type, notification) {
+  _sendNotification(String jid, String type, String notification) {
     if (type == null || type.isEmpty) type = 'chat';
 
     this.connection.send(Strophe.$msg({'to': jid, 'type': type}).c(
