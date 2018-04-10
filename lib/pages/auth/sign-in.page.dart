@@ -24,9 +24,10 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-    TextEditingController _textFieldPhoneNumberController = new TextEditingController();
-    TextEditingController _textFieldCodeController = new TextEditingController();
-    GlobalKey<ScaffoldState> _scaffold = new GlobalKey();
+    TextEditingController _phoneNumberController = new TextEditingController();
+    TextEditingController _codeController = new TextEditingController();
+    GlobalKey<ScaffoldState> _scaffold = new GlobalKey<ScaffoldState>();
+    GlobalKey<FormState> _form = new GlobalKey<FormState>();
     XmppProvider _xmpp = XmppProvider.instance();
     double _linearProgressIndicatorValue = 0.0;
     String _password;
@@ -50,30 +51,38 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     new Padding(
                         padding: new EdgeInsets.symmetric(horizontal: 16.0),
-                        child: new Column(
-                            children: [
-                                new TextField(
-                                    decoration: new InputDecoration(
-                                        hintText: isStep1 ? 'Phone number' : 'Code',
-                                    ),
-                                    controller: isStep1 ? _textFieldPhoneNumberController : _textFieldCodeController,
-                                    keyboardType: isStep1 ? TextInputType.phone : TextInputType.number,
-                                ),
-                                new SizedBox(
-                                    height: 5.0,
-                                ),
-                                new Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                        new FlatButton(
-                                            child: new Text(isStep1 ? 'NEXT' : 'SIGN IN'),
-                                            onPressed: isStep1 ? _getCode : _getPassword,
-                                            textColor: Theme.of(context).primaryColor
+                        child: new Form(
+                            key: _form,
+                            child: new Column(
+                                children: [
+                                    new TextField(
+                                        decoration: new InputDecoration(
+                                            hintText: isStep1 ? 'Phone number' : 'Code',
                                         ),
-                                    ],
-                                )
-                            ],
-                        ),
+                                        controller: isStep1 ? _phoneNumberController : _codeController,
+                                        keyboardType: isStep1 ? TextInputType.phone : TextInputType.number,
+                                        autofocus: true,
+                                    ),
+                                    new SizedBox(
+                                        height: 5.0,
+                                    ),
+                                    new Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                            new FlatButton(
+                                                child: new Text(isStep1 ? 'NEXT' : 'SIGN IN'),
+                                                onPressed: () {
+                                                    if (_form.currentState.validate()) {
+                                                        isStep1 ? _getCode() : _getPassword();
+                                                    }
+                                                },
+                                                textColor: Theme.of(context).primaryColor
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        )
                     ),
                 ],
             )
@@ -89,15 +98,16 @@ class _SignInPageState extends State<SignInPage> {
             _linearProgressIndicatorValue = null;
         });
 
-        signInService.getCode(_textFieldPhoneNumberController.text)
+        signInService.getCode(_phoneNumberController.text)
         .then((http.Response r) {
             var body = JSON.decode(r.body);
+            print(body);
 
             Navigator.push(context, new MaterialPageRoute(
                 builder: (_) => new SignInPage(
                     step: 2,
                     code: body['code'],
-                    phoneNumber: _textFieldPhoneNumberController.text,
+                    phoneNumber: _phoneNumberController.text,
                 )
             ));
         })
@@ -118,10 +128,10 @@ class _SignInPageState extends State<SignInPage> {
             _linearProgressIndicatorValue = null;
         });
 
-        signInService.getPassword(widget.phoneNumber, _textFieldCodeController.text)
+        signInService.getPassword(widget.phoneNumber, _codeController.text)
         .then((http.Response r) {
             _password = JSON.decode(r.body)['password'];
-            _signUp();
+            _signIn();
         })
         .catchError((e) {
             print(e);
@@ -138,28 +148,39 @@ class _SignInPageState extends State<SignInPage> {
         super.initState();
 
         if (widget.step == 2 && widget.code != null) {
-            _textFieldCodeController.text = widget.code.toString();
+            _codeController.text = widget.code.toString();
         }
     }
 
     void _signUp() {
         _xmpp.register(widget.phoneNumber)
         .listen((ConnexionStatus status) {
-            print('ConnexionStatus: ${status.status}');
+            print('---ConnexionStatus---');
+            print('${status.status}');
+            print('${status.element}');
+            print('${status.condition}');
+            print('---ConnexionStatus---');
 
-            if (status.status == Strophe.Status['CONFLICT']) {
-                _signIn();
-            }
-            else if (status.status == Strophe.Status['REGISTERED']) {
-                _saveAccount();
-            }
+            // if (status.status == Strophe.Status['CONFLICT']) {
+            //     _signIn();
+            // }
+            // else if (status.status == Strophe.Status['REGISTERED']) {
+            //     _saveAccount();
+            // }
         });
     }
 
     void _signIn() {
         _xmpp.connect(widget.phoneNumber)
         .listen((ConnexionStatus status) {
-            print('ConnexionStatus: ${status.status}');
+            print('---ConnexionStatus---');
+            print('${status.status}');
+            print('${status.element}');
+            print('${status.condition}');
+            print('---ConnexionStatus---');
+            if (status.status == Strophe.Status['AUTHFAIL']) {
+                _signUp();
+            }
         });
     }
 
