@@ -28,7 +28,7 @@ class XmppProvider {
   static XmppProvider _instance;
   String _mucService = '';
   StropheConnection _connection;
-  String _host = '192.168.43.45';
+  String _host = '192.168.8.101';
   String _domain = "localhost";
   String _pass = "jesuis123";
   String _jid;
