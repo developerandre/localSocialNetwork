@@ -326,7 +326,7 @@ class RosterPlugin extends PluginClass {
     }
     if (type == 'unavailable') {
       item.resources.remove(Strophe.getResourceFromJid(jid));
-    } else if (type == null) {
+    } else if (type == null || type == '') {
       // TODO: add timestamp
       item.resources[Strophe.getResourceFromJid(jid)] = {
         'show': (presence.findAllElements('show').length > 0)
