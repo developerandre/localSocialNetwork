@@ -32,15 +32,16 @@ class PrivateStorage extends PluginClass {
    * (Function) error - Callback function on error
    */
 
-  set(String tag, String ns, data, Function success, Function error) {
+  set(String tag, String ns, data, [Function success, Function error]) {
     String id = this.connection.getUniqueId('saveXML');
-
+    ns = ns ?? 'namespace';
+    tag = tag ?? 'tag';
     StanzaBuilder iq = Strophe.$iq({'type': 'set', 'id': id}).c(
         'query', {'xmlns': Strophe.NS['PRIVATE']}).c(tag, {'xmlns': ns});
 
-    var d = this._transformData(data);
+    xml.XmlNode d = this._transformData(data);
 
-    if (d) {
+    if (d != null) {
       iq.cnode(d);
     }
 
@@ -59,7 +60,8 @@ class PrivateStorage extends PluginClass {
 
   get(String tag, String ns, Function success, [Function error]) {
     String id = this.connection.getUniqueId('loadXML');
-
+    ns = ns ?? 'namespace';
+    tag = tag ?? 'tag';
     StanzaBuilder iq = Strophe.$iq({'type': 'get', 'id': id}).c(
         'query', {'xmlns': Strophe.NS['PRIVATE']}).c(tag, {'xmlns': ns});
 
@@ -80,13 +82,13 @@ class PrivateStorage extends PluginClass {
   /**
    * PrivateFunction: _transformData
    */
-  _transformData(c) {
+  xml.XmlNode _transformData(c) {
     switch (c.runtimeType.toString()) {
       case "num":
       case "bool":
         return Strophe.xmlTextNode(c + '');
       case "String":
-        var dom = this._textToXml(c);
+        xml.XmlElement dom = this._textToXml(c);
 
         if (dom != null) {
           return dom;
@@ -113,7 +115,11 @@ class PrivateStorage extends PluginClass {
    */
 
   xml.XmlElement _textToXml(String text) {
-    return xml.parse(text).rootElement;
+    try {
+      return xml.parse(text).rootElement;
+    } catch (e) {
+      return xml.parse('<data>$text</data>').rootElement;
+    }
   }
   /**
    * PrivateFunction: _isNode

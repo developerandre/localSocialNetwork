@@ -6,7 +6,20 @@ import 'dart:math';
 import 'package:localsocialnetwork/strophe/bosh.dart';
 import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/strophe/md5.dart';
+import 'package:localsocialnetwork/strophe/plugins/administration.dart';
+import 'package:localsocialnetwork/strophe/plugins/bookmark.dart';
+import 'package:localsocialnetwork/strophe/plugins/caps.dart';
+import 'package:localsocialnetwork/strophe/plugins/chat-notifications.dart';
+import 'package:localsocialnetwork/strophe/plugins/disco.dart';
+import 'package:localsocialnetwork/strophe/plugins/last-activity.dart';
+import 'package:localsocialnetwork/strophe/plugins/muc.dart';
+import 'package:localsocialnetwork/strophe/plugins/pep.dart';
 import 'package:localsocialnetwork/strophe/plugins/plugins.dart';
+import 'package:localsocialnetwork/strophe/plugins/privacy.dart';
+import 'package:localsocialnetwork/strophe/plugins/private-storage.dart';
+import 'package:localsocialnetwork/strophe/plugins/pubsub.dart';
+import 'package:localsocialnetwork/strophe/plugins/register.dart';
+import 'package:localsocialnetwork/strophe/plugins/vcard-temp.dart';
 import 'package:localsocialnetwork/strophe/sessionstorage.dart';
 import 'package:localsocialnetwork/strophe/sha1.dart';
 import 'package:localsocialnetwork/strophe/utils.dart';
@@ -101,6 +114,16 @@ class StanzaBuilder {
       return doc.rootElement;
     }
     return this.nodeTree;
+  }
+
+  xml.XmlElement get currentNode {
+    xml.XmlNode _currentNode = this.nodeTree.children[0];
+    for (int i = 1; i < this.node.length; i++) {
+      _currentNode = _currentNode.children[this.node[i]];
+    }
+    return _currentNode is xml.XmlDocument
+        ? _currentNode.rootElement
+        : _currentNode as xml.XmlElement;
   }
 
   /** Function: toString
@@ -227,12 +250,12 @@ class StanzaBuilder {
      *    The Strophe.Builder object.
      */
   StanzaBuilder cnode(xml.XmlNode elem) {
-    var newElem = Strophe.copyElement(elem);
+    xml.XmlNode newElem = Strophe.copyElement(elem);
     xml.XmlNode currentNode = this.nodeTree.children[0];
     for (int i = 1; i < this.node.length; i++) {
       currentNode = currentNode.children[this.node[i]];
     }
-    currentNode.children.add(Strophe.copyElement(newElem));
+    if (newElem != null) currentNode.children.add(Strophe.copyElement(newElem));
     this.node.add(currentNode.children.length - 1);
     return this;
   }
@@ -364,6 +387,7 @@ class StanzaHandler {
     if (this.options['matchBareFromJid']) {
       from = Strophe.getBareJidFromJid(from);
     }
+
     String elemType = elem.getAttribute("type");
     String id = elem.getAttribute("id");
     bool statement = this.type.indexOf(elemType) != -1;
@@ -387,10 +411,11 @@ class StanzaHandler {
      *  Returns:
      *    A boolean indicating if the handler should remain active.
      */
-  Future<bool> run(xml.XmlNode elem) async {
+  bool run(xml.XmlNode elem) {
     bool result = false;
     try {
-      result = await this.handler(elem) ?? false;
+      var handResult = this.handler(elem);
+      if (handResult == null || handResult == true) result = true;
     } catch (e) {
       Strophe.handleError(e);
       throw e;
@@ -483,51 +508,55 @@ class StropheConnection {
   bool doSession = false;
 
   bool doBind = false;
-  get register {
+  RegisterPlugin get register {
     return Strophe.connectionPlugins['register'];
   }
 
-  get disco {
+  DiscoPlugin get disco {
     return Strophe.connectionPlugins['disco'];
   }
 
-  get caps {
+  AdministrationPlugin get admin {
+    return Strophe.connectionPlugins['admin'];
+  }
+
+  CapsPlugin get caps {
     return Strophe.connectionPlugins['caps'];
   }
 
-  get muc {
+  MucPlugin get muc {
     return Strophe.connectionPlugins['muc'];
   }
 
-  get bookmarks {
+  BookMarkPlugin get bookmarks {
     return Strophe.connectionPlugins['bookmarks'];
   }
 
-  get lastactivity {
+  LastActivity get lastactivity {
     return Strophe.connectionPlugins['lastactivity'];
   }
 
-  get pep {
+  PepPlugin get pep {
     return Strophe.connectionPlugins['pep'];
   }
 
-  get privacy {
+  PrivacyPlugin get privacy {
     return Strophe.connectionPlugins['privacy'];
   }
 
-  get pubsub {
+  PubsubPlugin get pubsub {
     return Strophe.connectionPlugins['pubsub'];
   }
 
-  get private {
+  PrivateStorage get private {
     return Strophe.connectionPlugins['private'];
   }
 
-  get vcard {
+  VCardTemp get vcard {
     return Strophe.connectionPlugins['vcard'];
   }
 
-  get chatstates {
+  ChatStatesNotificationPlugin get chatstates {
     return Strophe.connectionPlugins['chatstates'];
   }
 
@@ -605,7 +634,7 @@ class StropheConnection {
     this.service = service;
     // Configuration options
     this.options = options ?? {};
-    var proto = this.options['protocol'] ?? "";
+    String proto = this.options['protocol'] ?? "";
 
     // Select protocal based on service or options
     if (service.indexOf("ws:") == 0 ||
@@ -790,7 +819,7 @@ class StropheConnection {
     this._proto = pro;
   }
 
-  get data {
+  List<dynamic> get data {
     return this._data;
   }
 
@@ -1279,7 +1308,7 @@ class StropheConnection {
     }
 
     if (callback == null || errback == null) {
-      var handler = this.addHandler((stanza) {
+      StanzaHandler handler = this.addHandler((stanza) {
         // remove timeout handler if there is one
         if (timeoutHandler != null) {
           this.deleteTimedHandler(timeoutHandler);
@@ -1325,7 +1354,8 @@ class StropheConnection {
                                                                                      *  Returns:
                                                                                      *    The id used to send the IQ.
                                                                                     */
-  sendIQ(xml.XmlNode el, [Function callback, Function errback, int timeout]) {
+  String sendIQ(xml.XmlNode el,
+      [Function callback, Function errback, int timeout]) {
     StanzaTimedHandler timeoutHandler;
     xml.XmlElement elem = el;
     if (el is xml.XmlDocument)
@@ -1340,14 +1370,13 @@ class StropheConnection {
     }
 
     if (callback != null || errback != null) {
-      print('has calback');
-      var handler = this.addHandler((stanza) {
+      StanzaHandler handler = this.addHandler((stanza) {
         // remove timeout handler if there is one
-        print(stanza);
         if (timeoutHandler != null) {
           this.deleteTimedHandler(timeoutHandler);
         }
-        String iqtype = elem.getAttribute("type");
+        if (stanza is xml.XmlDocument) stanza = stanza.rootElement;
+        String iqtype = stanza.getAttribute("type");
         if (iqtype == 'result') {
           if (callback != null) {
             callback(stanza);
@@ -1363,7 +1392,6 @@ class StropheConnection {
           };
         }
       }, null, 'iq', ['error', 'result'], id);
-
       // if timeout specified, set up a timeout handler.
       if (timeout != null && timeout > 0) {
         timeoutHandler = this.addTimedHandler(timeout, () {
@@ -1516,7 +1544,7 @@ class StropheConnection {
                                                                                                                                                                              *  Returns:
                                                                                                                                                                              *    A reference to the handler this can be used to remove it.
                                                                                                                                                                              */
-  addHandler(Function handler, String ns, String name,
+  StanzaHandler addHandler(Function handler, String ns, String name,
       [type, String id, String from, options]) {
     StanzaHandler hand =
         Strophe.Handler(handler, ns, name, type, id, from, options);
@@ -1540,7 +1568,7 @@ class StropheConnection {
     this.removeHandlers.add(handRef);
     // If a handler is being deleted while it is being added,
     // prevent it from getting added
-    var i = this.addHandlers.indexOf(handRef);
+    int i = this.addHandlers.indexOf(handRef);
     if (i >= 0) {
       this.addHandlers.removeAt(i);
     }
@@ -1744,7 +1772,7 @@ class StropheConnection {
 
     // remove handlers scheduled for deletion
     int i;
-    var hand;
+    StanzaHandler hand;
     while (this.removeHandlers.length > 0) {
       hand = this.removeHandlers.removeLast();
       i = this.handlers.indexOf(hand);
@@ -1752,7 +1780,6 @@ class StropheConnection {
         this.handlers.removeAt(i);
       }
     }
-
     // add handlers scheduled for addition
     while (this.addHandlers.length > 0) {
       this.handlers.add(this.addHandlers.removeLast());
@@ -1762,8 +1789,17 @@ class StropheConnection {
       this._doDisconnect();
       return;
     }
-
-    String type = elem.getAttribute('type');
+    xml.XmlElement stanza;
+    if (elem.name.qualified == this._proto.strip)
+      stanza = elem.firstChild as xml.XmlElement;
+    else
+      stanza = elem;
+    String type = stanza.getAttribute('type');
+    if (type == null) {
+      try {
+        type = (elem.firstChild as xml.XmlElement).getAttribute('type');
+      } catch (e) {}
+    }
     String cond;
     Iterable<xml.XmlElement> conflict;
     if (type != null && type == "terminate") {
@@ -1788,20 +1824,19 @@ class StropheConnection {
       this._doDisconnect(cond);
       return;
     }
-
     // send each incoming stanza through the handler chain
-    Strophe.forEachChild(elem, null, (child) async {
-      List<StanzaHandler> newList;
+    Strophe.forEachChild(elem, null, (child) {
       // process handlers
-      newList = this.handlers;
+      List<StanzaHandler> newList = this.handlers;
       this.handlers = [];
+
       for (int i = 0; i < newList.length; i++) {
         StanzaHandler hand = newList.elementAt(i);
         // encapsulate 'handler.run' not to lose the whole handler list if
         // one of the handlers throws an exception
         try {
           if (hand.isMatch(child) && (this.authenticated || !hand.user)) {
-            if (await hand.run(child)) {
+            if (hand.run(child)) {
               this.handlers.add(hand);
             }
           } else {
@@ -1833,7 +1868,8 @@ class StropheConnection {
   }
 
   _noAuthReceived([Function _callback]) {
-    var errorMsg = "Server did not offer a supported authentication mechanism";
+    String errorMsg =
+        "Server did not offer a supported authentication mechanism";
     Strophe.error(errorMsg);
     this._changeConnectStatus(
         Strophe.Status['CONNFAIL'], Strophe.ErrorCondition['NO_AUTH_MECH']);
@@ -2369,8 +2405,9 @@ class StropheConnection {
 
   _onIdle() {
     int i;
-    var thand, since, newList;
-
+    int since;
+    List<StanzaTimedHandler> newList;
+    StanzaTimedHandler thand;
     // add timed handlers scheduled for addition
     // NOTE: we add before remove in the case a timed handler is
     // added and then deleted before the next _onIdle() call.
@@ -2570,7 +2607,7 @@ class StropheSASLPlain extends StropheSASLMechanism {
 
   Future<String> onChallenge(StropheConnection connection,
       [String challenge, dynamic testCnonce]) async {
-    var authStr = connection.authzid;
+    String authStr = connection.authzid;
     authStr = authStr + "\u0000";
     authStr = authStr + connection.authcid;
     authStr = authStr + "\u0000";
@@ -2701,8 +2738,8 @@ class StropheSASLMD5 extends StropheSASLMechanism {
     RegExp attribMatch = new RegExp(r'([a-z]+)=("[^"]+"|[^,"]+)(?:,|$)');
     String cnonce = testCnonce ??
         MD5.hexdigest(new Random().nextInt(1234567890).toString());
-    var realm = "";
-    var host;
+    String realm = "";
+    String host;
     String nonce = "";
     String qop = "";
     List<Match> matches;
@@ -2732,12 +2769,12 @@ class StropheSASLMD5 extends StropheSASLMechanism {
       }
     }
 
-    var digestUri = connection.servtype + "/" + connection.domain;
+    String digestUri = connection.servtype + "/" + connection.domain;
     if (host != null) {
       digestUri = digestUri + "/" + host;
     }
 
-    var cred = Utils.utf16to8(
+    String cred = Utils.utf16to8(
         connection.authcid + ":" + realm + ":" + this._connection.pass);
     String a1 = await MD5.hash(cred) + ":" + nonce + ":" + cnonce;
     String a2 = 'AUTHENTICATE:' + digestUri;

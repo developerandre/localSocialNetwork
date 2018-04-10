@@ -77,7 +77,7 @@ class Strophe {
          * XHTML tag names are case sensitive and must be lower case.
          */
     'validTag': (String tag) {
-      for (var i = 0; i < Strophe.XHTML['tags'].length; i++) {
+      for (int i = 0; i < Strophe.XHTML['tags'].length; i++) {
         if (tag == Strophe.XHTML['tags'][i]) {
           return true;
         }
@@ -103,7 +103,7 @@ class Strophe {
       return false;
     },
     'validCSS': (style) {
-      for (var i = 0; i < Strophe.XHTML['css'].length; i++) {
+      for (int i = 0; i < Strophe.XHTML['css'].length; i++) {
         if (style == Strophe.XHTML['css'][i]) {
           return true;
         }
@@ -143,10 +143,18 @@ class Strophe {
      *      function should take a single argument, a DOM element.
      */
   static void forEachChild(elem, String elemName, Function func) {
-    xml.XmlElement childNode;
+    if (elem == null) return;
+    var childNode;
     for (int i = 0; i < elem.children.length; i++) {
-      childNode = elem.children.elementAt(i);
-      //Strophe.ElementType['NORMAL']
+      try {
+        if (elem.children.elementAt(i) is xml.XmlElement)
+          childNode = elem.children.elementAt(i);
+        else if (elem.children.elementAt(i) is xml.XmlDocument)
+          childNode = elem.rootElement.children.elementAt(i);
+      } catch (e) {
+        childNode = null;
+      }
+      if (childNode == null) continue;
       if (childNode.nodeType == xml.XmlNodeType.ELEMENT &&
           (elemName == null || isTagEqual(childNode, elemName))) {
         func(childNode);
@@ -294,7 +302,7 @@ class Strophe {
      */
   static xml.XmlNode xmlTextNode(String text) {
     xml.XmlBuilder builder = Strophe.xmlGenerator();
-    builder.element('strophe', namespace: 'jabber:client', nest: text);
+    builder.element('strophe', nest: text);
     return builder.build();
   }
 
@@ -356,11 +364,13 @@ class Strophe {
      *    A new, copied DOM element tree.
      */
   static xml.XmlNode copyElement(xml.XmlNode elem) {
-    var el;
+    var el = elem;
     if (elem.nodeType == xml.XmlNodeType.ELEMENT) {
       el = elem.copy();
     } else if (elem.nodeType == xml.XmlNodeType.TEXT) {
       el = elem;
+    } else if (elem.nodeType == xml.XmlNodeType.DOCUMENT) {
+      el = elem.document.rootElement;
     }
     return el;
   }
