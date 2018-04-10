@@ -1,3 +1,4 @@
+import 'package:connectivity/connectivity.dart';
 import 'package:contacts_service/contacts_service.dart';
 import 'package:localsocialnetwork/providers/models.dart';
 import 'package:localsocialnetwork/strophe/core.dart';
@@ -8,10 +9,11 @@ class StoreProvider {
   List<AppContact> _contacts;
   bool isConnected = false;
   List<AppMessage> _messages;
+  ConnectivityResult networkStatus;
   StoreProvider._();
   StoreProvider._internal() {
     this._contacts = [];
-    this._getContacts();
+    //this._getContacts();
     this._messages = [];
   }
   List<AppContact> get contacts {
@@ -86,7 +88,7 @@ class StoreProvider {
         return appContact;
       }).toList();
     }).catchError((e) {
-      print(e);
+      print('get contacts error $e');
     });
   }
 }

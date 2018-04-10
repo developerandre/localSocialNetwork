@@ -19,6 +19,7 @@ import 'package:localsocialnetwork/strophe/plugins/privacy.dart';
 import 'package:localsocialnetwork/strophe/plugins/private-storage.dart';
 import 'package:localsocialnetwork/strophe/plugins/pubsub.dart';
 import 'package:localsocialnetwork/strophe/plugins/register.dart';
+import 'package:localsocialnetwork/strophe/plugins/roster.dart';
 import 'package:localsocialnetwork/strophe/plugins/vcard-temp.dart';
 import 'package:localsocialnetwork/strophe/sessionstorage.dart';
 import 'package:localsocialnetwork/strophe/sha1.dart';
@@ -501,19 +502,27 @@ class StropheConnection {
 
   String domain;
 
-  String features;
+  xml.XmlElement features;
 
   Map<String, dynamic> _saslData;
 
   bool doSession = false;
 
   bool doBind = false;
+
+  Function _startConnection;
+
+  Function _attachConnection;
   RegisterPlugin get register {
     return Strophe.connectionPlugins['register'];
   }
 
   DiscoPlugin get disco {
     return Strophe.connectionPlugins['disco'];
+  }
+
+  RosterPlugin get roster {
+    return Strophe.connectionPlugins['roster'];
   }
 
   AdministrationPlugin get admin {
@@ -693,6 +702,8 @@ class StropheConnection {
     this.registerSASLMechanisms(this.options['mechanisms']);
 
     this.initializeFunction();
+    this._startConnection = this._connect;
+    this._attachConnection = this._attach;
     // initialize plugins
     Strophe.connectionPlugins.forEach((String key, dynamic value) {
       Strophe.connectionPlugins[key].init(this);
@@ -766,10 +777,10 @@ class StropheConnection {
       // Check for the stream:features tag
       bool hasFeatures;
       if (bodyWrap.getAttribute('xmlns') == Strophe.NS['STREAM']) {
-        hasFeatures = bodyWrap.findAllElements("features").length > 0 ||
+        hasFeatures = bodyWrap.findAllElements("features").length > 0 ??
             bodyWrap.findAllElements("stream:features").length > 0;
       } else {
-        hasFeatures = bodyWrap.findAllElements("stream:features").length > 0 ||
+        hasFeatures = bodyWrap.findAllElements("stream:features").length > 0 ??
             bodyWrap.findAllElements("features").length > 0;
       }
       if (!hasFeatures) {
@@ -974,7 +985,15 @@ class StropheConnection {
      *      certificate), set authcid to this same JID. See XEP-178 for more
      *      details.
      */
-  connect(String jid, String pass, ConnectCallBack callback,
+  Function get connect {
+    return this._startConnection ?? _connect;
+  }
+
+  set connect(Function value) {
+    this._startConnection = value;
+  }
+
+  _connect(String jid, String pass, ConnectCallBack callback,
       [int wait, int hold, String route, String authcid]) {
     this.jid = jid;
     /** Variable: authzid
@@ -1037,8 +1056,16 @@ class StropheConnection {
      *    (Integer) wind - The optional HTTBIND window value.  This is the
      *      allowed range of request ids this are valid.  The default is 5.
      */
-  attach(String jid, String sid, int rid, Function callback, int wait, int hold,
-      int wind) {
+  Function get attach {
+    return this._attachConnection ?? _attach;
+  }
+
+  set attach(Function value) {
+    this._attachConnection = value;
+  }
+
+  _attach(String jid, String sid, int rid, Function callback, int wait,
+      int hold, int wind) {
     if (this._proto is StropheBosh) {
       this._proto.attach(jid, sid, rid, callback, wait, hold, wind);
     } else {
@@ -2171,7 +2198,7 @@ class StropheConnection {
     xml.XmlElement elem = element is xml.XmlDocument
         ? element.rootElement
         : (element as xml.XmlElement);
-    this.features = elem.toString();
+    this.features = elem;
     xml.XmlElement child;
     for (int i = 0; i < elem.children.length; i++) {
       child = elem.children.elementAt(i) as xml.XmlElement;

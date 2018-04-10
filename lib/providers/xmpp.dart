@@ -18,6 +18,7 @@ import 'package:localsocialnetwork/strophe/plugins/privacy.dart';
 import 'package:localsocialnetwork/strophe/plugins/private-storage.dart';
 import 'package:localsocialnetwork/strophe/plugins/pubsub.dart';
 import 'package:localsocialnetwork/strophe/plugins/register.dart';
+import 'package:localsocialnetwork/strophe/plugins/roster.dart';
 import 'package:localsocialnetwork/strophe/plugins/vcard-temp.dart';
 import 'package:xml/xml.dart' as xml;
 
@@ -32,13 +33,14 @@ class XmppProvider {
   static XmppProvider _instance;
   String _mucService = '';
   StropheConnection _connection;
-  String _host = '192.168.20.192';
+  String _host = '192.168.8.101';
   String _domain = "localhost";
   String _pass = "jesuis123";
   String _jid;
   String _url;
   Map<String, PluginClass> _plugins = {
     'register': new RegisterPlugin(),
+    'roster': new RosterPlugin(),
     'chatstates': new ChatStatesNotificationPlugin(),
     'vcard': new VCardTemp(),
     'private': new PrivateStorage(),
@@ -97,10 +99,11 @@ class XmppProvider {
     return "$phone@$domain";
   }
 
-  Stream<ConnexionStatus> connect(String phone) {
+  Stream<ConnexionStatus> connect(String phone, [String password]) {
     StreamController<ConnexionStatus> streamController =
         new StreamController<ConnexionStatus>();
     String jid = this._formatToJid(phone);
+    this._pass = password ?? this._pass;
     if (this._pass == null ||
         this._pass.isEmpty ||
         jid == null ||
@@ -127,7 +130,7 @@ class XmppProvider {
     return streamController.stream;
   }
 
-  Stream<ConnexionStatus> register(String phone) {
+  Stream<ConnexionStatus> register(String phone, [String password]) {
     StreamController<ConnexionStatus> streamController =
         new StreamController<ConnexionStatus>();
     if (this._connection.register == null) {
@@ -141,6 +144,7 @@ class XmppProvider {
         streamController.add(new ConnexionStatus(status, condition, ele));
       if (status == Strophe.Status['REGISTER']) {
         print('register');
+        this._pass = password ?? this._pass;
         this._connection.register.fields['username'] = phone;
         this._connection.register.fields['password'] = this._pass;
         this._connection.register.fields['name'] = phone;
@@ -165,6 +169,7 @@ class XmppProvider {
         streamController.close();
         print('is connected');
         this.handleAfterConnect();
+        this.createBookmarksNode();
       } else if (status == Strophe.Status['DISCONNECTED']) {
         StoreProvider.instance.isConnected = false;
         streamController.close();
@@ -187,7 +192,59 @@ class XmppProvider {
     this.handleNormalMessage();
   }
 
-  void getRoster() {}
+  void getRoster() {
+    this
+        ._connection
+        .roster
+        .registerCallback((List<RosterItem> items, [item, previousItem]) {
+      print('registerCallback $items $item $previousItem');
+    });
+    this._connection.roster.registerRequestCallback((String result) {
+      print('registerRequestCallback $result');
+    });
+    this._connection.roster.get((List<RosterItem> result) {
+      result.forEach((RosterItem element) {
+        print('${element.jid} ${element.ask} ${element.resources}');
+        if (element.ask == 'subscribe') this.subscribeToJid(element.jid);
+      });
+    });
+  }
+
+  subscribeToJid(String jid) {
+    jid = this._formatToJid(jid);
+    this._connection.roster.subscribe(jid);
+  }
+
+  unSubscribeToJid(String jid) {
+    jid = this._formatToJid(jid);
+    this._connection.roster.unsubscribe(jid);
+  }
+
+  authorizeJid(String jid) {
+    jid = this._formatToJid(jid);
+    this._connection.roster.authorize(jid);
+  }
+
+  unAuthorizeJid(String jid) {
+    jid = this._formatToJid(jid);
+    this._connection.roster.unauthorize(jid);
+  }
+
+  addJidToRoster(String phone, [List groups]) {
+    String jid = this._formatToJid(phone);
+    this._connection.roster.add(jid, phone, groups);
+  }
+
+  updateJidInRoster(String phone, [List groups]) {
+    String jid = this._formatToJid(phone);
+    this._connection.roster.update(jid, phone, groups);
+  }
+
+  deleteJidInRoster(String jid) {
+    jid = this._formatToJid(jid);
+    this._connection.roster.remove(jid, (iq) {});
+  }
+
   void handlePresence() {
     this._connection.addHandler((presence) {
       return true;
