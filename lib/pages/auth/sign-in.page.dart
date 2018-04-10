@@ -143,23 +143,27 @@ class _SignInPageState extends State<SignInPage> {
     }
 
     void _signUp() {
-        _xmpp.register(widget.phoneNumber)
-        .listen((ConnexionStatus status) {
-            print('ConnexionStatus: ${status.status}');
+        // _xmpp.register(widget.phoneNumber)
+        // .listen((ConnexionStatus status) {
+        //     print('ConnexionStatus: ${status.status}');
 
-            if (status.status == Strophe.Status['CONFLICT']) {
+        //     if (status.status == Strophe.Status['CONFLICT']) {
                 _signIn();
-            }
-            else if (status.status == Strophe.Status['REGISTERED']) {
-                _saveAccount();
-            }
-        });
+        //     }
+        //     else if (status.status == Strophe.Status['REGISTERED']) {
+        //         _saveAccount();
+        //     }
+        // });
     }
 
     void _signIn() {
         _xmpp.connect(widget.phoneNumber)
         .listen((ConnexionStatus status) {
-            print('ConnexionStatus: ${status.status}');
+            print('---ConnexionStatus---');
+            print('${status.status}');
+            print('${status.element}');
+            print('${status.condition}');
+            print('---ConnexionStatus---');
         });
     }
 
