@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:localsocialnetwork/providers/models.dart';
+import 'package:localsocialnetwork/providers/store.dart';
 import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/strophe/enums.dart';
 import 'package:localsocialnetwork/strophe/plugins/administration.dart';
@@ -114,11 +115,14 @@ class XmppProvider {
         streamController.add(new ConnexionStatus(status, condition, ele));
       if (status == Strophe.Status['CONNECTED']) {
         print("is Connect");
+        StoreProvider.instance.isConnected = true;
         this.jid = jid;
         this.handleAfterConnect();
         streamController.close();
-      } else if (status == Strophe.Status['DISCONNECTED'])
+      } else if (status == Strophe.Status['DISCONNECTED']) {
+        StoreProvider.instance.isConnected = false;
         streamController.close();
+      }
     });
     return streamController.stream;
   }
@@ -148,14 +152,22 @@ class XmppProvider {
         this._connection.authenticate(null);
       } else if (status == Strophe.Status['CONFLICT']) {
         print("Contact already existed!");
+        streamController.close();
       } else if (status == Strophe.Status['NOTACCEPTABLE']) {
         print("Registration form not properly filled out.");
+        streamController.close();
       } else if (status == Strophe.Status['REGIFAIL']) {
         print(
             "The Server does not support In-Band Registration $condition $ele");
+        streamController.close();
       } else if (status == Strophe.Status['CONNECTED']) {
+        StoreProvider.instance.isConnected = true;
+        streamController.close();
         print('is connected');
         this.handleAfterConnect();
+      } else if (status == Strophe.Status['DISCONNECTED']) {
+        StoreProvider.instance.isConnected = false;
+        streamController.close();
       }
     });
     return streamController.stream;
@@ -202,10 +214,9 @@ class XmppProvider {
               '$sender vous invite à rejoindre le groupe $room';
           notification.from = sender;
           notification.notificationType = NotificationType.GROUP_INVITATION;
+          StoreProvider.instance
+              .addNotification(notification, notification.from);
         }
-      } else if (domain == this._domain) {
-        // is directed invitation
-
       }
       return true;
     }, Strophe.NS['MUC_USER'], 'message');
@@ -240,27 +251,30 @@ class XmppProvider {
       String from = msg.getAttribute('from');
       List<xml.XmlElement> composing =
           msg.findAllElements('composing').toList();
-      if (composing.length > 0) {}
+      if (composing.length > 0) {
+        StoreProvider.instance
+            .setContactInfos(from, ContactField.writing, true);
+      }
       return true;
     }, Strophe.NS['CHATSTATES'], 'message', ['chat', 'groupchat']);
   }
 
   void handleGroupMessage() {
-    this._connection.addHandler((msg) {
+    this._connection.addHandler((xml.XmlElement msg) {
       print(msg);
       return true;
     }, null, 'message', 'groupchat');
   }
 
   void handleMessage() {
-    this._connection.addHandler((msg) {
+    this._connection.addHandler((xml.XmlElement msg) {
       print(msg);
       return true;
     }, null, 'message', 'chat');
   }
 
   void handleNormalMessage() {
-    this._connection.addHandler((msg) {
+    this._connection.addHandler((xml.XmlElement msg) {
       print(msg);
       return true;
     }, null, 'message', 'normal');
@@ -273,11 +287,21 @@ class XmppProvider {
 
   getLastActivity(String jid) {
     jid = this._formatToJid(jid);
-    this._connection.lastactivity.getLastActivity(jid, (iq) {}, (err) {});
+    this._connection.lastactivity.getLastActivity(jid, (xml.XmlElement iq) {
+      List<xml.XmlElement> query = iq.findAllElements('query').toList();
+      if (query.length > 0) {
+        String seconds = query[0].getAttribute('seconds');
+        StoreProvider.instance
+            .setContactInfos(jid, ContactField.lastSeen, int.parse(seconds));
+      }
+    }, (err) {});
   }
 
   sendComposing(String jid, [String type = 'chat']) {
-    jid = this._formatToJid(jid);
+    if (type == 'chat')
+      jid = this._formatToJid(jid);
+    else if (type == 'groupchat')
+      jid = this._formatToJid(jid, this._mucService);
     this._connection.chatstates.sendComposing(jid, type);
   }
 
@@ -301,11 +325,17 @@ class XmppProvider {
   }
 
   getRegisteredUsersNum() {
-    this._connection.admin.getRegisteredUsersNum((iq) {}, (error) {});
+    this
+        ._connection
+        .admin
+        .getRegisteredUsersNum((xml.XmlElement iq) {}, (error) {});
   }
 
   getOnlineUsersNum() {
-    this._connection.admin.getOnlineUsersNum((iq) {}, (error) {});
+    this
+        ._connection
+        .admin
+        .getOnlineUsersNum((xml.XmlElement iq) {}, (error) {});
   }
 
   createCanal(String node) {
@@ -318,35 +348,38 @@ class XmppProvider {
       'pubsub#notify_delete': '1',
       'pubsub#send_last_published_item': 'on_sub_and_presence'
     };
-    this._connection.pubsub.createNode(node, config, (result) {});
+    this
+        ._connection
+        .pubsub
+        .createNode(node, config, (xml.XmlElement result) {});
   }
 
   getDefaultCanalConfig() {
-    this._connection.pubsub.getDefaultNodeConfig((iq) {});
+    this._connection.pubsub.getDefaultNodeConfig((xml.XmlElement iq) {});
   }
 
   getCanalCanalConfig(String node) {
-    this._connection.pubsub.getConfig(node, (iq) {});
+    this._connection.pubsub.getConfig(node, (xml.XmlElement iq) {});
   }
 
   discoverCanals() {
-    this._connection.pubsub.discoverNodes((iq) {}, (iq) {});
+    this._connection.pubsub.discoverNodes((xml.XmlElement iq) {}, (iq) {});
   }
 
   getCanalItems(String node) {
-    this._connection.pubsub.items(node, (iq) {}, (iq) {});
+    this._connection.pubsub.items(node, (xml.XmlElement iq) {}, (iq) {});
   }
 
   publishCanalItems(String node, List<Map<String, dynamic>> items) {
-    this._connection.pubsub.publish(node, items, (iq) {});
+    this._connection.pubsub.publish(node, items, (xml.XmlElement iq) {});
   }
 
   getSubscriptionsOfUserJid() {
-    this._connection.pubsub.getSubscriptions((iq) {});
+    this._connection.pubsub.getSubscriptions((xml.XmlElement iq) {});
   }
 
   getCanalAffiliations(String node) {
-    this._connection.pubsub.getAffiliations(node, (iq) {});
+    this._connection.pubsub.getAffiliations(node, (xml.XmlElement iq) {});
   }
 
   setCanalAffiliations(String node, String jid, String affiliation) {
@@ -355,28 +388,34 @@ class XmppProvider {
   }
 
   subscribeToCanal(String node) {
-    this._connection.pubsub.subscribe(node, null, (evt) {}, (iq) {});
+    this
+        ._connection
+        .pubsub
+        .subscribe(node, null, (xml.XmlElement evt) {}, (xml.XmlElement iq) {});
   }
 
   unsubscribeToCanal(String node, String jid) {
     jid = this._formatToJid(jid);
-    this._connection.pubsub.unsubscribe(node, jid, null, (iq) {}, (err) {});
+    this
+        ._connection
+        .pubsub
+        .unsubscribe(node, jid, null, (xml.XmlElement iq) {}, (err) {});
   }
 
   getCanalSubscriptions(String node) {
-    this._connection.pubsub.getNodeSubscriptions(node, (iq) {});
+    this._connection.pubsub.getNodeSubscriptions(node, (xml.XmlElement iq) {});
   }
 
   deleteCanal(String node) {
-    this._connection.pubsub.deleteNode(node, (iq) {});
+    this._connection.pubsub.deleteNode(node, (xml.XmlElement iq) {});
   }
 
   publishPepItems(String node, List<Map<String, dynamic>> items) {
-    this._connection.pep.publish(node, items, (iq) {});
+    this._connection.pep.publish(node, items, (xml.XmlElement iq) {});
   }
 
   subscribeToPep(String node) {
-    this._connection.pep.subscribe(node, (iq) {});
+    this._connection.pep.subscribe(node, (xml.XmlElement iq) {});
   }
 
   unsubscribeToPep(String node) {
@@ -430,28 +469,33 @@ class XmppProvider {
         .newItem(type, value, action, order, blocked);
   }
 
-  getvCard([String jid]) {
+  getvCard([String jid, Function callback]) {
     jid = this._formatToJid(jid);
     this._connection.vcard.get(
-        (iq) {
+        (xml.XmlElement iq) {
           print("getvCard: $iq");
+          StoreProvider.instance.setContactInfos(jid, ContactField.vCard, iq);
+          if (callback != null) callback(true);
         },
         jid,
         (iq) {
           print("error of getting vCard");
+          if (callback != null) callback(false);
         });
   }
 
-  setvCard(VCardEl ele, [String jid]) {
+  setvCard(VCardEl ele, [String jid, Function callback]) {
     jid = this._formatToJid(jid);
     this._connection.vcard.set(
         (iq) {
           print(iq);
+          if (callback != null) callback(true);
         },
         ele,
         jid,
         (iq) {
           print("error of getting vCard");
+          if (callback != null) callback(false);
         });
   }
 
@@ -588,12 +632,12 @@ class XmppProvider {
     this._connection.muc.createConfiguredRoom(room, config, (iqSuccess) {
       print('$room crée avec success');
       print(iqSuccess);
+      this.addOrUpdateBookmark(room, room);
       if (members != null && members.length > 0) {
         members.forEach((member) {
           this.modifyGroupAffiliation(room, member);
         });
       }
-      this.getConfigOfGroup(room);
       this.joinGroup(room, Strophe.getNodeFromJid(this.jid));
       this.setTopic(room, name);
     }, (iqError) {
