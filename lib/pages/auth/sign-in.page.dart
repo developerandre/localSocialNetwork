@@ -70,9 +70,8 @@ class _SignInPageState extends State<SignInPage> {
                         new FlatButton(
                             child: new Text(isStep1 ? 'NEXT' : 'SIGN IN'),
                             onPressed: () {
-                              if (_form.currentState.validate()) {
+                              if (_form.currentState.validate())
                                 isStep1 ? _getCode() : _getPassword();
-                              }
                             },
                             textColor: Theme.of(context).primaryColor),
                       ],
@@ -145,29 +144,21 @@ class _SignInPageState extends State<SignInPage> {
 
   void _signUp() {
     _xmpp.register(widget.phoneNumber).listen((ConnexionStatus status) {
-      print('---ConnexionStatus---');
-      print('${status.status}');
-      print('${status.element}');
-      print('${status.condition}');
-      print('---ConnexionStatus---');
-
-      // if (status.status == Strophe.Status['CONFLICT']) {
-      //     _signIn();
-      // }
-      // else if (status.status == Strophe.Status['REGISTERED']) {
-      //     _saveAccount();
-      // }
+      print('_signUp ${status.status} ${status.element} ${status.condition}');
+      if (status.status == Strophe.Status['CONFLICT']) {
+        _xmpp.connection.doDisconnect();
+        _signIn();
+      } else if (status.status == Strophe.Status['REGISTERED']) {
+        _saveAccount();
+      }
     });
   }
 
   void _signIn() {
     _xmpp.connect(widget.phoneNumber).listen((ConnexionStatus status) {
-      print('---ConnexionStatus---');
-      print('${status.status}');
-      print('${status.element}');
-      print('${status.condition}');
-      print('---ConnexionStatus---');
+      print('_signIn ${status.status} ${status.element} ${status.condition}');
       if (status.status == Strophe.Status['AUTHFAIL']) {
+        _xmpp.connection.doDisconnect();
         _signUp();
       }
     });

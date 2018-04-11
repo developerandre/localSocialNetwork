@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:localsocialnetwork/pages/auth/auth.service.dart';
 import 'package:localsocialnetwork/providers/models.dart';
 import 'package:localsocialnetwork/providers/store.dart';
 import 'package:localsocialnetwork/strophe/core.dart';
@@ -33,7 +34,7 @@ class XmppProvider {
   static XmppProvider _instance;
   String _mucService = '';
   StropheConnection _connection;
-  String _host = '192.168.8.101';
+  String _host = '192.168.20.192';
   String _domain = "localhost";
   String _pass = "jesuis123";
   String _jid;
@@ -168,6 +169,7 @@ class XmppProvider {
         StoreProvider.instance.isConnected = true;
         streamController.close();
         print('is connected');
+        setAlready(phone, true);
         this.handleAfterConnect();
         this.createBookmarksNode();
       } else if (status == Strophe.Status['DISCONNECTED']) {
@@ -196,16 +198,19 @@ class XmppProvider {
     this
         ._connection
         .roster
-        .registerCallback((List<RosterItem> items, [item, previousItem]) {
-      print('registerCallback $items $item $previousItem');
-    });
-    this._connection.roster.registerRequestCallback((String result) {
-      print('registerRequestCallback $result');
+        .registerCallback((List<RosterItem> items, [item, previousItem]) {});
+    this._connection.roster.registerRequestCallback((String jid) {
+      if (jid != this.jid) {
+        this.authorizeJid(jid);
+        this.subscribeToJid(jid);
+      }
     });
     this._connection.roster.get((List<RosterItem> result) {
       result.forEach((RosterItem element) {
-        print('${element.jid} ${element.ask} ${element.resources}');
-        if (element.ask == 'subscribe') this.subscribeToJid(element.jid);
+        if (element.ask == 'subscribe') {
+          this.authorizeJid(element.jid);
+          if (element.subscription == 'from') this.subscribeToJid(element.jid);
+        }
       });
     });
   }

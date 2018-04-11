@@ -2655,7 +2655,8 @@ class StropheSASLSHA1 extends StropheSASLMechanism {
 
   Future<String> onChallenge(StropheConnection connection,
       [String challenge, String testCnonce]) async {
-    if (first) return await this._onChallenge(connection, challenge);
+    if (first && challenge != null && challenge.isNotEmpty)
+      return await this._onChallenge(connection, challenge);
     Random random = new Random();
     String cnonce = testCnonce ??
         await MD5.hexdigest((random.nextDouble() * 1234567890).toString());
