@@ -152,6 +152,7 @@ class StropheWebSocket extends ServiceType {
   _connect() {
     // Ensure that there is no open WebSocket from a previous Connection.
     //this._closeSocket();
+
     if (this.socketListen == null || this.socket == null) {
       // Create the new WebSocket
       WebSocket.connect(this._conn.service, protocols: ['xmpp']).then(
@@ -331,7 +332,9 @@ class StropheWebSocket extends ServiceType {
       try {
         this.socket.handleError(() {});
         this.socketListen.cancel();
+        this.socketListen = null;
         this.socket.close();
+        this.socket = null;
       } catch (e) {}
     }
   }
