@@ -1,14 +1,16 @@
 import 'package:localsocialnetwork/strophe/core.dart';
+import 'package:localsocialnetwork/utils.dart';
 import 'package:xml/xml/nodes/element.dart';
 
 class AppMessage {}
 
 class AppContact {
   String _jid;
-  String phone;
+  String _phone;
   String name;
   String firstName;
   String lastName;
+  String subscription;
   bool silent;
   int order;
   bool writing;
@@ -21,22 +23,50 @@ class AppContact {
   String activity;
   ContactVCard vCard;
   List<ContactNotification> notifications;
+  String ask;
+
   AppContact() {
     this.isBlocked = false;
     this.mood = '';
+    this.subscription = "none";
+    this.ask = "none";
+    this.lastSeen = -1;
     this.location = '';
     this.activity = "";
     this.silent = false;
     this.order = 0;
     this.writing = false;
+    this.notifications = [];
   }
+  String get phone {
+    return this._phone;
+  }
+
+  set phone(String newPhone) {
+    if (newPhone != null && newPhone.isNotEmpty) {
+      newPhone = this._formatToJid(newPhone);
+      this._phone = Strophe.getNodeFromJid(newPhone);
+      this.jid = this._phone;
+    }
+  }
+
   String get jid {
     return this._jid;
   }
 
   set jid(String newJid) {
-    if (newJid != null && newJid.isNotEmpty)
+    if (newJid != null && newJid.isNotEmpty) {
+      newJid = this._formatToJid(newJid);
       this._jid = Strophe.getBareJidFromJid(newJid);
+    }
+  }
+
+  String _formatToJid(String phone, [String domain]) {
+    if (domain == null || domain.isEmpty) domain = DOMAIN;
+    if (phone != null && phone.indexOf("@$domain") != -1) {
+      return phone;
+    }
+    return "$phone@$domain";
   }
 }
 
