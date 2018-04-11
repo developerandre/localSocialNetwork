@@ -1,4 +1,4 @@
-const String HOST = 'localsocialnetwork.herokuapp.com';
+const String host = 'localsocialnetwork.herokuapp.com';
 
 class AppPreferences {
     AppPreferences._internal();
