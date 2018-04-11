@@ -21,6 +21,7 @@ import 'package:localsocialnetwork/strophe/plugins/pubsub.dart';
 import 'package:localsocialnetwork/strophe/plugins/register.dart';
 import 'package:localsocialnetwork/strophe/plugins/roster.dart';
 import 'package:localsocialnetwork/strophe/plugins/vcard-temp.dart';
+import 'package:localsocialnetwork/utils.dart';
 import 'package:xml/xml.dart' as xml;
 
 class ConnexionStatus {
@@ -35,7 +36,7 @@ class XmppProvider {
   String _mucService = '';
   StropheConnection _connection;
   String _host = '192.168.20.192';
-  String _domain = "localhost";
+  String _domain;
   String _pass = "jesuis123";
   String _jid;
   String _url;
@@ -57,6 +58,7 @@ class XmppProvider {
   };
   XmppProvider._();
   XmppProvider._internal([Map<String, PluginClass> plugins]) {
+    _domain = DOMAIN;
     _url = "ws://$_host:5280/xmpp";
     _mucService = "conference.$_domain";
     if (plugins != null) _plugins.addAll(plugins);
@@ -198,18 +200,39 @@ class XmppProvider {
     this
         ._connection
         .roster
-        .registerCallback((List<RosterItem> items, [item, previousItem]) {});
+        .registerCallback((List<RosterItem> items, [item, previousItem]) {
+      StoreProvider.instance.mergeContacts(items);
+    });
     this._connection.roster.registerRequestCallback((String jid) {
       if (jid != this.jid) {
         this.authorizeJid(jid);
-        this.subscribeToJid(jid);
+        RosterItem findItem = this._connection.roster.findItem(jid);
+        if (findItem != null) {
+          if (findItem.ask == 'subscribe') {
+            this.authorizeJid(findItem.jid);
+            if (findItem.subscription == 'from' ||
+                findItem.subscription == 'none')
+              this.subscribeToJid(findItem.jid);
+          } else if (findItem.ask == 'unsubscribe') {
+            this.unAuthorizeJid(findItem.jid);
+            this.unSubscribeToJid(findItem.jid);
+          }
+        } else {
+          this.addJidToRoster(jid);
+          this.authorizeJid(jid);
+          this.subscribeToJid(jid);
+        }
       }
     });
     this._connection.roster.get((List<RosterItem> result) {
       result.forEach((RosterItem element) {
         if (element.ask == 'subscribe') {
           this.authorizeJid(element.jid);
-          if (element.subscription == 'from') this.subscribeToJid(element.jid);
+          if (element.subscription == 'from' || element.subscription == 'none')
+            this.subscribeToJid(element.jid);
+        } else if (element.ask == 'unsubscribe') {
+          this.unAuthorizeJid(element.jid);
+          this.unSubscribeToJid(element.jid);
         }
       });
     });
@@ -251,7 +274,15 @@ class XmppProvider {
   }
 
   void handlePresence() {
-    this._connection.addHandler((presence) {
+    this._connection.addHandler((xml.XmlElement presence) {
+      print("presence $presence");
+      String id = presence.getAttribute('id');
+      if (id != null && id.endsWith(":sendOnLine")) {
+        String from = presence.getAttribute('from');
+        from = Strophe.getBareJidFromJid(from);
+        String type = presence.getAttribute('type');
+        StoreProvider.instance.updateContactPresence(from, type);
+      }
       return true;
     }, null, 'presence');
   }
@@ -344,7 +375,8 @@ class XmppProvider {
 
   sendPresence() {
     if (!this._connection.connected) return;
-    _connection.sendPresence(Strophe.$pres().tree());
+    _connection.sendPresence(Strophe
+        .$pres({'id': this._connection.getUniqueId("sendOnLine")}).tree());
   }
 
   getLastActivity(String jid) {
