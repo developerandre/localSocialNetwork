@@ -47,6 +47,7 @@ class _ContactsPageState extends State<ContactsPage> {
               );
             }
             _contacts = snapchot.data;
+            print("contacts snap ${_contacts.length}");
             return new ListView(
               children: _contactsTiles(),
             );
@@ -75,10 +76,8 @@ class _ContactsPageState extends State<ContactsPage> {
       tiles.add(new Padding(
           padding: new EdgeInsets.only(right: 15.0),
           child: new Divider(indent: 60.0)));
-      tiles.add(new Dismissible(
-        onDismissed: (DismissDirection direction) {},
-        key: new Key(contact.phone),
-        child: new Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+      tiles.add(
+        new Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
           new Container(
             margin: new EdgeInsets.only(
                 top: 5.0, bottom: 3.0, left: 8.0, right: 10.0),
@@ -144,32 +143,7 @@ class _ContactsPageState extends State<ContactsPage> {
               child: new Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    new Row(children: <Widget>[
-                      new Container(
-                        width: 5.0,
-                        height: 5.0,
-                        margin: new EdgeInsets.symmetric(horizontal: 1.0),
-                        decoration: new BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.green.shade600),
-                      ),
-                      new Padding(
-                        padding: const EdgeInsets.all(2.0),
-                        child: new Stack(children: <Widget>[
-                          new Icon(Icons.arrow_drop_down),
-                          new Positioned(
-                            top: 0.0,
-                            right: 0.0,
-                            child: new Icon(Icons.brightness_1,
-                                size: 8.0, color: Colors.redAccent),
-                          )
-                        ]),
-                      ),
-                      new Padding(
-                        padding: const EdgeInsets.all(5.0),
-                        child: new Text("10:30"),
-                      )
-                    ]),
+                    new Row(children: _headOptions(contact)),
                     new Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -208,9 +182,43 @@ class _ContactsPageState extends State<ContactsPage> {
                     ),
                   ]))
         ]),
-      ));
+      );
     });
     tiles.removeAt(0);
     return tiles;
+  }
+
+  _headOptions(AppContact contact) {
+    print("${contact.jid} ${contact?.lastSeen}");
+    List options = [
+      new Padding(
+        padding: const EdgeInsets.all(2.0),
+        child: new Stack(children: <Widget>[
+          new Icon(Icons.arrow_drop_down),
+          new Positioned(
+            top: 0.0,
+            right: 0.0,
+            child: new Icon(Icons.brightness_1,
+                size: 8.0, color: Colors.redAccent),
+          )
+        ]),
+      ),
+      new Padding(
+        padding: const EdgeInsets.all(5.0),
+        child: new Text("10:30"),
+      )
+    ];
+    if (contact.lastSeen != null && contact.lastSeen == 0) {
+      options.insert(
+          0,
+          new Container(
+            width: 5.0,
+            height: 5.0,
+            margin: new EdgeInsets.symmetric(horizontal: 1.0),
+            decoration: new BoxDecoration(
+                shape: BoxShape.circle, color: Colors.green.shade600),
+          ));
+    }
+    return options;
   }
 }

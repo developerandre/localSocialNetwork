@@ -52,8 +52,16 @@ class StoreProvider {
   }
 
   updateContactPresence(String from, String type) {
+    from = 'tonandre@localhost';
+    String str = '${this._contacts.length} ';
+    this._contacts.forEach((String key, value) {
+      str += (value.jid ?? '') + '-';
+    });
+    print(str);
     AppContact contact = this._contacts[Strophe.getBareJidFromJid(from)];
+    print("contact $contact");
     if (contact != null) {
+      print(type);
       if (type != null && type == 'unavailable') {
         contact.lastSeen = -1;
       } else {
@@ -127,6 +135,7 @@ class StoreProvider {
   }
 
   _getContacts() {
+    if (true == true) return;
     AppContact appContact;
     ContactsService.getContacts().then((Iterable<Contact> mcontacts) {
       mcontacts.toList().forEach((Contact mcontact) {
