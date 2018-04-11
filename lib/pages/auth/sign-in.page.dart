@@ -95,19 +95,19 @@ class _SignInPageState extends State<SignInPage> {
         });
 
         sign_in_service.getCode(_phoneNumberController.text).then((http.Response r) {
-        var body = JSON.decode(r.body);
-        print(body);
+            var body = JSON.decode(r.body);
+            print(body);
 
-        Navigator.push(
-            context,
-            new MaterialPageRoute(
-                builder: (_) => new SignInPage(
-                    step: 2,
-                    code: body['code'],
-                    phoneNumber: _phoneNumberController.text,
+            Navigator.push(
+                context,
+                new MaterialPageRoute(
+                    builder: (_) => new SignInPage(
+                        step: 2,
+                        code: body['code'],
+                        phoneNumber: _phoneNumberController.text,
+                    )
                 )
-            )
-        );
+            );
         })
         .catchError((e) {
             print(e);
@@ -128,16 +128,14 @@ class _SignInPageState extends State<SignInPage> {
 
         sign_in_service.getPassword(widget.phoneNumber, _codeController.text)
         .then((http.Response r) {
-            _password = JSON.decode(r.body)['password'];
-            _signIn();
+            dynamic body = JSON.decode(r.body);
+            _password = body['password'];
+
+            body['already'] == 'true' ? _signIn(): _signUp();
         })
         .catchError((e) {
             print(e);
-        }).whenComplete(() {
-            setState(() {
-                _linearProgressIndicatorValue = 0.0;
-            });
-        });
+        }).whenComplete(() {});
     }
 
     @override
@@ -150,29 +148,32 @@ class _SignInPageState extends State<SignInPage> {
     }
 
     void _signUp() {
-        _xmpp.register(widget.phoneNumber).listen((ConnexionStatus status) {
+        _xmpp.register(widget.phoneNumber)
+        .listen((ConnexionStatus status) {
             print('_signUp ${status.status} ${status.element} ${status.condition}');
-            if (status.status == Strophe.Status['CONFLICT']) {
-                _xmpp.connection.doDisconnect();
-                _signIn();
-            } else if (status.status == Strophe.Status['REGISTERED']) {
+            if (status.status == Strophe.Status['CONNECTED']) {
                 _saveAccount();
             }
         });
     }
 
     void _signIn() {
-        _xmpp.connect(widget.phoneNumber).listen((ConnexionStatus status) {
+        _xmpp.connect(widget.phoneNumber)
+        .listen((ConnexionStatus status) {
             print('_signIn ${status.status} ${status.element} ${status.condition}');
-            if (status.status == Strophe.Status['AUTHFAIL']) {
-                _xmpp.connection.doDisconnect();
-                _signUp();
+            if (status.status == Strophe.Status['CONNECTED']) {
+                _saveAccount();
             }
         });
     }
 
     void _saveAccount() {
-        SharedPreferences.getInstance().then((SharedPreferences preferences) {
+        setState(() {
+            _linearProgressIndicatorValue = 0.0;
+        });
+
+        SharedPreferences.getInstance()
+        .then((SharedPreferences preferences) {
             preferences.setString(AppPreferences.phoneNumber, widget.phoneNumber);
             preferences.setString(AppPreferences.password, _password);
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:localsocialnetwork/providers/xmpp.dart';
 import 'package:localsocialnetwork/utils.dart';
 
 
@@ -9,6 +10,8 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
+    XmppProvider _xmpp = XmppProvider.instance();
+
     @override
     Widget build(BuildContext context) => new Scaffold(
         appBar: new AppBar(
@@ -30,6 +33,8 @@ class _AccountPageState extends State<AccountPage> {
     );
 
     void _signOut() {
+        _xmpp.disconnect();
+
         SharedPreferences.getInstance()
         .then((SharedPreferences preferences) {
             preferences.clear();
