@@ -2,16 +2,17 @@ const String host = 'localsocialnetwork.herokuapp.com';
 const String DOMAIN = "localhost";
 
 class AppPreferences {
-  AppPreferences._internal();
+    AppPreferences._internal();
 
-  static String get phoneNumber => 'phoneNumber';
-  static String get password => 'password';
+    static String get phoneNumber => 'phoneNumber';
+    static String get password => 'password';
 }
 
 class AppRoutes {
-  AppRoutes._internal();
+    AppRoutes._internal();
 
-  static String get contacts => '/contacts';
-  static String get signIn => '/sign-in';
-  static String get account => '/account';
+    static String get contacts => '/contacts';
+    static String get signIn => '/sign-in';
+    static String get account => '/account';
+    static String get avatar => '/avatar';
 }

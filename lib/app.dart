@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:localsocialnetwork/pages/contacts/contacts.page.dart';
-import 'package:localsocialnetwork/pages/auth/sign-in.page.dart';
-import 'package:localsocialnetwork/pages/account/account.page.dart';
-import 'package:localsocialnetwork/utils.dart';
+import './pages/contacts/contacts.page.dart';
+import './pages/auth/sign-in.page.dart';
+import './pages/account/account.page.dart';
+import './pages/account/profile_picture.page.dart';
+import './utils.dart';
 
 
 class MyApp extends StatelessWidget {
@@ -16,6 +17,7 @@ class MyApp extends StatelessWidget {
             AppRoutes.contacts: (_) => new ContactsPage(),
             AppRoutes.signIn: (_) => new SignInPage(),
             AppRoutes.account: (_) => new AccountPage(),
+            AppRoutes.avatar: (_) => new ProfilePicturePage(),
         },
         theme: new ThemeData(
             primarySwatch: Colors.blue,
