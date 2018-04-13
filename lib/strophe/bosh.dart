@@ -790,7 +790,8 @@ class StropheBosh extends ServiceType {
      *  Returns:
      *    The stanza that was passed.
      */
-  xml.XmlElement reqToData(StropheRequest req) {
+  xml.XmlElement reqToData(dynamic req) {
+    req = req as StropheRequest;
     return this._reqToData(req);
   }
 

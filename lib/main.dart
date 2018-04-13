@@ -2,21 +2,21 @@
 
 import 'package:flutter/material.dart';
 import 'package:localsocialnetwork/app.dart';
-// import 'package:localsocialnetwork/providers/store.dart';
-// import 'package:localsocialnetwork/providers/xmpp.dart';
+import 'package:localsocialnetwork/providers/store.dart';
+import 'package:localsocialnetwork/providers/xmpp.dart';
 
 void main() {
   // StoreProvider.instance;
   // XmppProvider instance = XmppProvider.instance();
-  /* instance.connection.xmlInput = (elem) {
-    print('xmlInput $elem');
-  };
-
-  instance.connection.xmlOutput = (elem) {
-    print('xmlOutput $elem');
-  }; */
+  // instance.connection.xmlInput = (elem) {
+  //   print('xmlInput $elem');
+  // };
+  // instance.connection.xmlOutput = (elem) {
+  //   print('xmlOutput $elem');
+  // };
   // instance.connect("tonandre").listen((ConnexionStatus status) {
-  //   print('connexion status ${status.status}');
+  //   print(
+  //       'connexion status ${status.status} ${status.condition} ${status.element}');
   // });
   runApp(new MyApp());
 }

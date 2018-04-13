@@ -26,11 +26,16 @@ class ChatStatesNotificationPlugin extends PluginClass {
   }
 
   _notificationReceived(element) {
+    print(element.runtimeType);
     xml.XmlElement message;
     if (element is String) {
       message = xml.parse(element).rootElement;
-    }
-    if (message.findAllElements('error').length > 0) return true;
+    } else if (element is xml.XmlElement)
+      message = element;
+    else if (element is xml.XmlDocument) message = element.rootElement;
+
+    if (message != null && message.findAllElements('error').length > 0)
+      return true;
 
     /* List<xml.XmlElement> composing =
             message.findAllElements('composing').toList(),
