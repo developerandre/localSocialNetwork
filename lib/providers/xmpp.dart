@@ -56,6 +56,8 @@ class XmppProvider {
     'pep': new PepPlugin(),
     'lastactivity': new LastActivity()
   };
+
+  Object _pubSubService;
   XmppProvider._();
   XmppProvider._internal([Map<String, PluginClass> plugins]) {
     _domain = DOMAIN;
@@ -183,7 +185,6 @@ class XmppProvider {
   }
 
   handleAfterConnect() {
-    this.sendPresence();
     this.getRoster();
     this.handlePresence();
     this.handlePepMessage();
@@ -225,6 +226,7 @@ class XmppProvider {
       }
     });
     this._connection.roster.get((List<RosterItem> result) {
+      this.sendPresence();
       result.forEach((RosterItem element) {
         if (element.ask == 'subscribe') {
           this.authorizeJid(element.jid);
@@ -277,11 +279,15 @@ class XmppProvider {
     this._connection.addHandler((xml.XmlElement presence) {
       print("presence $presence");
       String id = presence.getAttribute('id');
-      if (id != null && id.endsWith(":sendOnLine")) {
+      String type = presence.getAttribute('type') ?? '';
+      List<xml.XmlElement> delay = presence.findAllElements('delay').toList();
+      if ((id != null && id.endsWith(":sendOnLine")) ||
+          type == 'unavailable' ||
+          delay.length > 0) {
         String from = presence.getAttribute('from');
         from = Strophe.getBareJidFromJid(from);
-        String type = presence.getAttribute('type');
-        StoreProvider.instance.updateContactPresence(from, type);
+        String stamp = delay.length > 0 ? delay[0].getAttribute('stamp') : '';
+        StoreProvider.instance.updateContactPresence(from, type, stamp);
       }
       return true;
     }, null, 'presence');
@@ -289,7 +295,7 @@ class XmppProvider {
 
   void handleInviteMessage() {
     this._connection.addHandler((xml.XmlElement msg) {
-      print(msg);
+      print('handleInviteMessage $msg');
       String from = msg.getAttribute('from');
       String domain = Strophe.getDomainFromJid(from);
       String sender, room;
@@ -317,7 +323,11 @@ class XmppProvider {
 
   void handleEventsMessage() {
     this._connection.addHandler((xml.XmlElement msg) {
-      print(msg);
+      print('handleEventsMessage $msg');
+      String from = msg.getAttribute('from');
+      String domain = Strophe.getDomainFromJid(from);
+      String sender, room;
+      if (domain == this._pubSubService) {}
       return true;
     }, Strophe.NS['PUBSUB_EVENT'], 'message');
   }
@@ -340,13 +350,18 @@ class XmppProvider {
 
   void handleComposingMessage() {
     this._connection.addHandler((xml.XmlElement msg) {
-      print(msg);
+      print('handleComposingMessage $msg');
       String from = msg.getAttribute('from');
       List<xml.XmlElement> composing =
           msg.findAllElements('composing').toList();
+      print('composing ${composing.length}');
       if (composing.length > 0) {
         StoreProvider.instance
             .setContactInfos(from, ContactField.writing, true);
+        new Timer(new Duration(milliseconds: 10000), () {
+          StoreProvider.instance
+              .setContactInfos(from, ContactField.writing, false);
+        });
       }
       return true;
     }, Strophe.NS['CHATSTATES'], 'message', ['chat', 'groupchat']);
@@ -354,21 +369,57 @@ class XmppProvider {
 
   void handleGroupMessage() {
     this._connection.addHandler((xml.XmlElement msg) {
-      print(msg);
+      print('handleGroupMessage $msg');
       return true;
     }, null, 'message', 'groupchat');
   }
 
   void handleMessage() {
     this._connection.addHandler((xml.XmlElement msg) {
-      print(msg);
+      String from = msg.getAttribute('from');
+      String to = msg.getAttribute('to');
+      from = Strophe.getBareJidFromJid(from);
+      from = this._formatToJid(from);
+      to = Strophe.getBareJidFromJid(to);
+      to = this._formatToJid(to);
+      if (!_namespaceMatch(msg, Strophe.NS['CHATSTATES'])) {
+        print('handleMessage $msg');
+        List<xml.XmlElement> body = msg.findAllElements('body').toList();
+        if (body.length == 0) return true;
+        String id = '0';
+        List<xml.XmlElement> p = body[0].findElements('p').toList();
+        if (p.length > 0) id = p[0].getAttribute('id') ?? '0';
+        if (id == '0') {
+          List<xml.XmlElement> delay =
+              body[0].findAllElements('delay').toList();
+          if (delay.length > 0) {
+            String stamp = delay[0].getAttribute('stamp');
+            if (stamp != null) {
+              id = DateTime.parse(stamp).millisecondsSinceEpoch.toString();
+            }
+          }
+        }
+        List<xml.XmlElement> blockquote =
+            body[0].findAllElements('blockquote').toList();
+        Map<String, dynamic> message = {
+          'content': body[0].toString(),
+          'id': int.parse(id),
+          'date': int.parse(id),
+          'name': Strophe.getNodeFromJid(from),
+          'from': from,
+          'to': to,
+          'blockquote': blockquote.length > 0 ? blockquote[0] : ''
+        };
+        StoreProvider.instance
+            .addMessages(this.jid, new AppMessage.fromMap(message));
+      }
       return true;
     }, null, 'message', 'chat');
   }
 
   void handleNormalMessage() {
     this._connection.addHandler((xml.XmlElement msg) {
-      print(msg);
+      print('handleNormalMessage $msg');
       return true;
     }, null, 'message', 'normal');
   }
@@ -400,9 +451,20 @@ class XmppProvider {
   }
 
   sendMessage(String jid, String message,
-      {String userName = '', String blockquote = '', String type = 'chat'}) {
-    if (!this._connection.connected) return;
+      {String userName = '', String blockquoteId = '', String type = 'chat'}) {
     jid = this._formatToJid(jid);
+    String now = new DateTime.now().millisecondsSinceEpoch.toString();
+    Map<String, dynamic> sms = {
+      'content': message,
+      'id': int.parse(now),
+      'date': int.parse(now),
+      'name': Strophe.getNodeFromJid(this.jid),
+      'from': this.jid,
+      'to': jid,
+      'blockquote': blockquoteId
+    };
+    StoreProvider.instance.addMessages(this.jid, new AppMessage.fromMap(sms));
+    if (!this._connection.connected) return;
     StanzaBuilder msg = Strophe
         .Builder('message', attrs: {'to': jid, 'from': this.jid, 'type': type});
     msg
@@ -411,9 +473,8 @@ class XmppProvider {
         .up()
         .c('html', {'xmlns': 'http://jabber.org/protocol/xhtml-im'}).c(
             'body', {'xmlns': 'http://www.w3.org/1999/xhtml'});
-    if (blockquote != null && blockquote.isNotEmpty)
-      msg.c('blockquote').t(blockquote).up();
-    String now = new DateTime.now().millisecondsSinceEpoch.toString();
+    if (blockquoteId != null && blockquoteId.isNotEmpty)
+      msg.c('blockquote').t(blockquoteId).up();
     msg.c('p', {'date': now, 'id': now}).t(message.toString()).up();
     this._connection.send(msg.tree());
   }
@@ -445,7 +506,7 @@ class XmppProvider {
     this
         ._connection
         .pubsub
-        .createNode(node, config, (xml.XmlElement result) {});
+        .createNode(null, config, (xml.XmlElement result) {});
   }
 
   getDefaultCanalConfig() {

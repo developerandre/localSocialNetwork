@@ -14,22 +14,20 @@ class StoreProvider {
   StreamController<List<AppContact>> contactsStream =
       new StreamController<List<AppContact>>();
   bool isConnected = false;
-  List<AppMessage> _messages;
+  Map<String, List<AppMessage>> _messages;
   ConnectivityResult networkStatus;
   StoreProvider._();
   StoreProvider._internal() {
     this._contacts = {};
     this._getContacts();
-    this._messages = [];
+    this._messages = {};
   }
   List<AppContact> get contacts {
-    List<AppContact> list = this._contacts.values.toList();
-    list.sort((a, b) => a.name.compareTo(b.name));
-    return list;
+    return this._sortContacts();
   }
 
-  List<AppMessage> get messages {
-    return this._messages;
+  List<AppMessage> messages(String key) {
+    return this._messages[key] ?? [];
   }
 
   static StoreProvider get instance {
@@ -37,6 +35,30 @@ class StoreProvider {
       _instance = new StoreProvider._internal();
     }
     return _instance;
+  }
+
+  String unread(List<AppMessage> msgs) {
+    if (msgs == null || msgs.length == 0) return '';
+    Iterable<AppMessage> where = msgs.where((AppMessage msg) {
+      return msg.unread;
+    }).toList();
+    return where.length.toString();
+  }
+
+  addMessages(String myJid, AppMessage message) {
+    if (message == null || myJid == null) return;
+    String jid = message.from == myJid ? message.to : message.from;
+    if (this._messages[jid] == null) {
+      this._messages[jid] = [];
+    }
+    int indexId = this._messages[jid].indexWhere((AppMessage msg) {
+      return msg.id == message.id;
+    });
+    if (indexId == -1)
+      this._messages[jid].add(message);
+    else
+      this._messages[jid].replaceRange(indexId, indexId + 1, [message]);
+    contactsStream.add(this._sortContacts());
   }
 
   addNotification(ContactNotification notification, String from) {
@@ -51,21 +73,17 @@ class StoreProvider {
     this._contacts[Strophe.getBareJidFromJid(from)] = contact;
   }
 
-  updateContactPresence(String from, String type) {
-    from = 'tonandre@localhost';
-    String str = '${this._contacts.length} ';
-    this._contacts.forEach((String key, value) {
-      str += (value.jid ?? '') + '-';
-    });
-    print(str);
+  updateContactPresence(String from, String type, [String stamp]) {
     AppContact contact = this._contacts[Strophe.getBareJidFromJid(from)];
-    print("contact $contact");
     if (contact != null) {
-      print(type);
       if (type != null && type == 'unavailable') {
-        contact.lastSeen = -1;
+        contact.lastSeen = stamp != null && stamp.isNotEmpty
+            ? int.parse(DateTime.parse(stamp).millisecondsSinceEpoch.toString())
+            : -1;
       } else {
-        contact.lastSeen = 0;
+        contact.lastSeen = stamp != null && stamp.isNotEmpty
+            ? int.parse(DateTime.parse(stamp).millisecondsSinceEpoch.toString())
+            : 0;
       }
       this._contacts[Strophe.getBareJidFromJid(from)] = contact;
       this.contactsStream.add(this.contacts);
@@ -88,7 +106,7 @@ class StoreProvider {
         appContact.subscription = item.subscription;
         appContact.ask = item.ask;
         appContact.typeContact = ContactType.INDIVIDU;
-        this._contacts.addAll({appContact.phone: appContact});
+        this._contacts.addAll({appContact.jid: appContact});
         contactsStream.add(_sortContacts());
       }
     });
@@ -119,6 +137,7 @@ class StoreProvider {
         mcontact.vCard = new ContactVCard.fromIq(value);
       }
       this._contacts[Strophe.getBareJidFromJid(jid)] = mcontact;
+      this.contactsStream.add(this.contacts);
     }
   }
 
@@ -130,7 +149,8 @@ class StoreProvider {
 
   List<AppContact> _sortContacts() {
     List<AppContact> list = this._contacts.values.toList();
-    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    list.sort((AppContact a, AppContact b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return list;
   }
 
@@ -156,14 +176,12 @@ class StoreProvider {
                       (mcontact.familyName ?? ''))
                   .trim();
           appContact.typeContact = ContactType.INDIVIDU;
-          this._contacts.putIfAbsent(appContact.phone, () {
+          this._contacts.putIfAbsent(appContact.jid, () {
             return appContact;
           });
         }
       });
       contactsStream.add(_sortContacts());
-    }).catchError((e) {
-      print('get contacts error $e');
-    });
+    }).catchError((e) {});
   }
 }

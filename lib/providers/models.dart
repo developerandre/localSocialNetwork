@@ -2,12 +2,41 @@ import 'package:localsocialnetwork/strophe/core.dart';
 import 'package:localsocialnetwork/utils.dart';
 import 'package:xml/xml/nodes/element.dart';
 
-class AppMessage {}
+class AppMessage {
+  String content = '';
+  int id = 0;
+  int date = 0;
+  String name = '';
+  String from = '';
+  String blockquote = '';
+  bool unread = false;
+  TypeMessage typeMessage;
+  SentStatus status;
+  String to = '';
+  String url = '';
+  AppMessage() {
+    typeMessage = TypeMessage.MESSAGE;
+  }
+  AppMessage.fromMap(Map<String, dynamic> map) {
+    content = map['content'];
+    id = map['id'];
+    date = map['date'];
+    name = map['name'];
+    from = map['from'];
+    to = map['to'];
+    blockquote = map['blockquote'];
+    typeMessage = map['typeMessage'] ?? TypeMessage.MESSAGE;
+    status = map['status'] ?? SentStatus.NO_DELIVERED;
+  }
+}
+
+enum SentStatus { NO_DELIVERED, SENT, RECEIVED, SEEN }
+enum TypeMessage { MESSAGE, IMAGE, VOCAL, AUDIO, VIDEO, DOCUMENT, CONTACT }
 
 class AppContact {
   String _jid;
   String _phone;
-  String name;
+  String _name;
   String firstName;
   String lastName;
   String subscription;
@@ -50,8 +79,19 @@ class AppContact {
     }
   }
 
+  String get name {
+    return this._name ?? '';
+  }
+
+  set name(String newName) {
+    if (newName != null && newName.isNotEmpty) {
+      newName = this._formatToJid(newName);
+      this._name = Strophe.getNodeFromJid(newName);
+    }
+  }
+
   String get jid {
-    return this._jid;
+    return this._jid ?? '';
   }
 
   set jid(String newJid) {

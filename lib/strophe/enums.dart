@@ -339,7 +339,7 @@ class StanzaHandler {
   String getNamespace(xml.XmlNode node) {
     xml.XmlElement elem =
         node is xml.XmlDocument ? node.rootElement : node as xml.XmlElement;
-    String elNamespace = elem.getAttribute("name") ?? '';
+    String elNamespace = elem.getAttribute("xmlns") ?? '';
     if (elNamespace != null &&
         elNamespace.isNotEmpty &&
         this.options['ignoreNamespaceFragment']) {
@@ -362,8 +362,8 @@ class StanzaHandler {
     if (this.ns == null || this.ns.isEmpty) {
       return true;
     } else {
-      Strophe.forEachChild(elem, null, (elem) {
-        if (this.getNamespace(elem) == this.ns) {
+      Strophe.forEachChild(elem, null, (child) {
+        if (this.getNamespace(child) == this.ns) {
           nsMatch = true;
         }
       });
@@ -705,7 +705,7 @@ class StropheConnection {
     this._startConnection = this._connect;
     this._attachConnection = this._attach;
     // initialize plugins
-    Strophe.connectionPlugins.forEach((String key, dynamic value) {
+    Strophe.connectionPlugins.forEach((String key, PluginClass value) {
       Strophe.connectionPlugins[key].init(this);
     });
   }
@@ -1690,7 +1690,7 @@ class StropheConnection {
     this._changeConnectStatus(status, condition, elem);
   }
 
-  _changeConnectStatus(int status, String condition, [xml.XmlNode elem]) {
+  _changeConnectStatus(int status,[ String condition, xml.XmlNode elem]) {
     // notify all plugins listening for status changes
     Strophe.connectionPlugins.forEach((String key, PluginClass plugin) {
       if (plugin.statusChanged != null) {
@@ -2927,7 +2927,7 @@ abstract class ServiceType {
 
   void doDisconnect() {}
 
-  xml.XmlElement reqToData(StropheRequest req) {
+  xml.XmlElement reqToData(dynamic req) {
     return null;
   }
 

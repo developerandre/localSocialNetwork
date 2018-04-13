@@ -1,4 +1,5 @@
 import 'package:localsocialnetwork/strophe/bosh.dart';
+import 'package:localsocialnetwork/strophe/plugins/plugins.dart';
 import 'package:localsocialnetwork/strophe/websocket.dart';
 import 'package:xml/xml.dart' as xml;
 import 'package:localsocialnetwork/strophe/enums.dart';
@@ -232,21 +233,26 @@ class Strophe {
     }
     if (attrs != null &&
         (attrs is! List<List<String>>) &&
-        (attrs is! Map<String, String>)) {
+        (attrs is! Map<String, dynamic>)) {
       return null;
     }
-
     Map<String, String> attributes = {};
     if (attrs != null) {
       if (attrs is List<List<String>>) {
         for (int i = 0; i < attrs.length; i++) {
           List<String> attr = attrs[i];
           if (attr.length == 2 && attr[1] != null && attr.isNotEmpty) {
-            attributes[attr[0]] = attr[1];
+            attributes[attr[0]] = attr[1].toString();
           }
         }
-      } else if (attrs is Map<String, String>) {
-        attributes = attrs;
+      } else if (attrs is Map<String, dynamic>) {
+        List<String> keys = attrs.keys.toList();
+        for (int i = 0,len = keys.length; i < len; i++) {
+          String key = keys[i];
+          if (key != null && key.isNotEmpty && attrs[key] != null) {
+            attributes[key] = attrs[key].toString();
+          }
+        }
       }
     }
     xml.XmlBuilder builder = Strophe.xmlGenerator();
@@ -654,8 +660,8 @@ class Strophe {
      *  _Private_ variable Used to store plugin names that need
      *  initialization on Strophe.Connection construction.
      */
-  static Map<String, dynamic> _connectionPlugins = {};
-  static Map<String, dynamic> get connectionPlugins {
+  static Map<String, PluginClass> _connectionPlugins = {};
+  static Map<String, PluginClass> get connectionPlugins {
     return _connectionPlugins;
   }
 
