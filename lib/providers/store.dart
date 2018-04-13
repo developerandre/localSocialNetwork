@@ -135,7 +135,7 @@ class StoreProvider {
   }
 
   _getContacts() {
-    if (true == true) return;
+    // if (true == true) return;
     AppContact appContact;
     ContactsService.getContacts().then((Iterable<Contact> mcontacts) {
       mcontacts.toList().forEach((Contact mcontact) {
