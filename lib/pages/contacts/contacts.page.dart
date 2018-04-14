@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:localsocialnetwork/pages/canaux/create-canal.dart';
 import 'package:localsocialnetwork/pages/groupes/create-groupe.dart';
 import 'package:localsocialnetwork/pages/profil/profil.dart';
 import 'package:localsocialnetwork/pages/serachbar.dart';
@@ -8,6 +7,7 @@ import 'package:localsocialnetwork/providers/store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:localsocialnetwork/pages/chat/chat.page.dart';
 import 'package:localsocialnetwork/utils.dart';
+import '../chain/create_chain.dialog.page.dart';
 
 class ContactsPage extends StatefulWidget {
   @override
@@ -349,17 +349,17 @@ class _ContactsPageState extends State<ContactsPage> {
         }));
     actions.add(new PopupMenuButton(
       itemBuilder: (_) => [
-            new PopupMenuItem(
-              value: AppBarAction.PROFIL,
-              child: new Text('Votre profil'),
-            ),
+            // new PopupMenuItem(
+            //   value: AppBarAction.PROFIL,
+            //   child: new Text('Votre profil'),
+            // ),
             new PopupMenuItem(
               value: AppBarAction.CREATE_GROUP,
-              child: new Text('Créer un groupe'),
+              child: new Text('Create a group'),
             ),
             new PopupMenuItem(
               value: AppBarAction.CREATE_PAGE,
-              child: new Text('Créer une page'),
+              child: new Text('Create a chain'),
             ),
             new PopupMenuItem(
               value: AppBarAction.ACCOUNT,
@@ -379,7 +379,7 @@ class _ContactsPageState extends State<ContactsPage> {
           Navigator.of(context).push(new MaterialPageRoute(
               fullscreenDialog: true,
               builder: (BuildContext context) {
-                return new CreateCanal();
+                return new CreateChainDialog();
               }));
         } else if (value == AppBarAction.PROFIL) {
           Navigator.of(context).push(new MaterialPageRoute(
